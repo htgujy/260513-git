@@ -3,512 +3,432 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Range: Neon Strike</title>
+    <title>Cyber Hero FPS - Overwatch Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- 가장 안정적인 unpkg CDN 사용 -->
+    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Inter', sans-serif; }
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(0, 255, 255, 0.7);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 5;
-        }
-        #crosshair::before, #crosshair::after {
-            content: '';
-            position: absolute;
-            background: rgba(0, 255, 255, 0.7);
-        }
-        #crosshair::before { top: 50%; left: -5px; width: 30px; height: 2px; transform: translateY(-50%); }
-        #crosshair::after { left: 50%; top: -5px; height: 30px; width: 2px; transform: translateX(-50%); }
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;700&display=swap');
         
-        .game-ui {
-            position: absolute;
-            color: #fff;
-            text-shadow: 0 0 5px rgba(0,0,0,0.5);
-            pointer-events: none;
-            user-select: none;
+        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background: #050505; color: white; }
+        canvas { display: block; }
+
+        /* UI Containers */
+        #ui-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 10;
         }
 
-        #ult-container {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100px;
-            height: 100px;
-            z-index: 10;
+        /* Main Menu */
+        #main-menu {
+            position: absolute; width: 100%; height: 100%;
+            background: radial-gradient(circle at 20% 50%, rgba(0,0,0,0.8) 0%, transparent 100%);
+            display: flex; flex-direction: column; justify-content: center;
+            padding-left: 8%; pointer-events: auto; transition: opacity 0.5s ease;
+        }
+        .menu-hidden { opacity: 0; pointer-events: none; }
+
+        #game-logo {
+            font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 5rem;
+            line-height: 1; margin-bottom: 2rem; text-transform: uppercase;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        .menu-btn {
+            font-family: 'Orbitron', sans-serif; font-size: 1.5rem; color: #ccc;
+            margin: 10px 0; cursor: pointer; transition: all 0.2s;
+            position: relative; padding-left: 0; text-transform: uppercase; letter-spacing: 2px;
+        }
+        .menu-btn:hover { color: #fff; padding-left: 20px; text-shadow: 0 0 10px #0ff; }
+
+        /* HUD */
+        #hud {
+            position: absolute; bottom: 0; width: 100%; height: 150px;
+            display: none; justify-content: space-between; align-items: flex-end;
+            padding: 0 50px 30px 50px;
+        }
+        .hud-visible { display: flex !important; }
+
+        .health-container {
+            width: 300px; background: rgba(0, 0, 0, 0.5);
+            border-left: 8px solid #fff; padding: 10px; transform: skewX(-15deg);
+        }
+        #health-bar { height: 20px; background: #fff; width: 100%; transition: width 0.3s; }
+
+        .ult-container {
+            position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
+            width: 120px; height: 120px; border-radius: 50%;
+            background: rgba(0, 0, 0, 0.6); border: 4px solid rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
         #ult-progress {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: conic-gradient(#ffcc00 0%, transparent 0%);
-            transition: background 0.1s;
+            position: absolute; bottom: 0; width: 100%; height: 0%;
+            background: #0ff; opacity: 0.5; transition: height 0.3s;
         }
-        #hit-marker {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 24px;
-            color: #ff4444;
-            opacity: 0;
-            transition: opacity 0.1s;
-            pointer-events: none;
-            z-index: 6;
-        }
-        .kill-feed {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            text-align: right;
-            color: #fff;
-            max-height: 200px;
-            overflow: hidden;
-        }
-        .ability-slot {
-            position: absolute;
-            bottom: 40px;
-            width: 70px;
-            height: 70px;
-            background: rgba(0, 0, 0, 0.6);
-            border: 2px solid #0ff;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
+        #ult-icon { z-index: 2; font-size: 2.5rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px #0ff; }
 
         #theme-toggle {
-            position: absolute;
-            top: 20px;
-            right: 150px; /* Kill feed와 겹치지 않게 조절 */
-            z-index: 70;
-            padding: 10px;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(8px);
+            position: absolute; top: 20px; right: 20px;
+            width: 50px; height: 50px; background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px); border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; pointer-events: auto; z-index: 100;
             border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            cursor: pointer;
-            pointer-events: auto;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 45px;
-            height: 45px;
         }
-        #theme-toggle:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.1);
+
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 30px; height: 30px; display: none;
         }
-        #theme-toggle svg {
-            width: 24px;
-            height: 24px;
-            fill: none;
-            stroke: currentColor;
-            stroke-width: 2;
-            stroke-linecap: round;
-            stroke-linejoin: round;
+
+        #hit-marker {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #ff4444; font-size: 2.5rem; opacity: 0; pointer-events: none; transition: opacity 0.1s;
+        }
+
+        #kill-feed { position: absolute; top: 80px; right: 20px; display: flex; flex-direction: column; gap: 5px; }
+        .kill-item {
+            background: rgba(0, 0, 0, 0.7); color: white; padding: 5px 15px;
+            border-right: 4px solid #0ff; animation: slideIn 0.3s forwards;
+            font-weight: bold; font-size: 0.8rem;
+        }
+
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; display: flex; align-items: center; justify-content: center;
+            z-index: 1000; font-family: 'Orbitron', sans-serif;
         }
     </style>
 </head>
 <body>
 
-<div id="ui-container">
-    <button id="theme-toggle" title="Toggle Brightness">
-        <svg id="theme-icon-sun" class="hidden text-yellow-400" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-        <svg id="theme-icon-moon" class="text-indigo-300" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-    </button>
+    <div id="loading-screen">LOADING ASSETS...</div>
 
-    <div id="crosshair"></div>
-    <div id="hit-marker">╳</div>
-    
-    <div class="game-ui top-5 left-5">
-        <div class="text-xs uppercase opacity-70 font-bold mb-1">Combatant Health</div>
-        <div class="w-64 h-4 bg-gray-800 rounded-full border border-white/20 overflow-hidden">
-            <div id="health-bar" class="h-full bg-cyan-400 transition-all duration-300" style="width: 100%"></div>
+    <div id="ui-container">
+        <div id="theme-toggle" onclick="toggleTheme(event)">
+            <svg id="theme-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2">
+                <path id="icon-path" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
         </div>
-        <div class="flex items-baseline gap-2 mt-1">
-            <span id="health" class="text-4xl font-black italic">200</span>
-            <span class="text-sm opacity-50">/ 200</span>
-        </div>
-        <div class="mt-4 text-cyan-400 font-bold">SCORE: <span id="score-val">0</span></div>
-    </div>
 
-    <div class="kill-feed" id="kill-feed"></div>
-
-    <div id="ult-container" class="flex items-center justify-center">
-        <div id="ult-progress"></div>
-        <div id="ult-inner" class="absolute inset-1 bg-black/80 rounded-full flex flex-col items-center justify-center border-2 border-white/10">
-            <span id="ult-text" class="text-2xl font-black text-white">0%</span>
-        </div>
-        <div class="absolute -bottom-8 text-[10px] font-bold text-yellow-400 uppercase tracking-[0.2em]">Ultimate [Q]</div>
-    </div>
-
-    <div class="ability-slot" style="right: 20%;">
-        <span class="text-[10px] text-cyan-300 font-bold">DASH</span>
-        <span class="text-xl font-black text-white">SHIFT</span>
-        <div id="dash-cooldown" class="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 transition-opacity rounded-lg">
-            <span class="text-white font-bold text-lg">0s</span>
-        </div>
-    </div>
-
-    <div id="instructions" class="absolute inset-0 flex flex-col items-center justify-center bg-black/95 text-white z-50 cursor-pointer">
-        <h1 class="text-8xl font-black italic mb-2 tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600">NEON STRIKE</h1>
-        <p class="text-2xl mb-12 animate-pulse text-cyan-300 font-light tracking-widest">CLICK TO INITIALIZE COMBAT</p>
-        <div class="grid grid-cols-3 gap-8 text-center border-t border-white/10 pt-8">
-            <div>
-                <div class="text-cyan-400 text-xs mb-2">MOVE</div>
-                <div class="text-xl font-bold">WASD</div>
+        <div id="main-menu" class="menu-hidden">
+            <div id="game-logo">NEON<br>STRIKE</div>
+            <div class="flex flex-col">
+                <div class="menu-btn" onclick="startGame()">▶ Play</div>
+                <div class="menu-btn" onclick="showSoon()">Heroes</div>
+                <div class="menu-btn" onclick="showSoon()">Settings</div>
             </div>
-            <div>
-                <div class="text-cyan-400 text-xs mb-2">DASH</div>
-                <div class="text-xl font-bold">L-SHIFT</div>
-            </div>
-            <div>
-                <div class="text-yellow-400 text-xs mb-2">ULTIMATE</div>
-                <div class="text-xl font-bold">Q</div>
+            <div class="absolute bottom-10 left-10 text-white/30 text-xs font-bold uppercase tracking-widest">
+                Overwatch Style Demo v1.5 - Stability Fix
             </div>
         </div>
+
+        <div id="hud">
+            <div class="health-container">
+                <div id="health-text" class="text-white text-[10px] font-bold mb-1">HP 200 / 200</div>
+                <div id="health-bar"></div>
+            </div>
+            <div class="ult-container">
+                <div id="ult-progress"></div>
+                <div id="ult-icon">Q</div>
+            </div>
+            <div class="flex gap-4 transform skewX(-15deg)">
+                <div class="w-16 h-16 bg-black/60 border-2 border-white flex items-center justify-center text-[10px]">SHIFT</div>
+            </div>
+        </div>
+
+        <div id="crosshair">
+            <svg viewBox="0 0 100 100" class="w-full h-full stroke-cyan-400 stroke-[5] fill-none">
+                <circle cx="50" cy="50" r="8" />
+                <line x1="50" y1="20" x2="50" y2="35" />
+                <line x1="50" y1="65" x2="50" y2="80" />
+                <line x1="20" y1="50" x2="35" y2="50" />
+                <line x1="65" y1="50" x2="80" y2="50" />
+            </svg>
+        </div>
+
+        <div id="hit-marker">╳</div>
+        <div id="kill-feed"></div>
     </div>
 
-    <div id="game-over" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-red-950/95 text-white z-[60]">
-        <h2 class="text-8xl font-black mb-4 italic">MISSION FAILED</h2>
-        <p id="final-score" class="text-3xl mb-12 font-light tracking-widest"></p>
-        <button onclick="location.reload()" class="px-12 py-4 bg-white text-red-900 font-black rounded-full hover:bg-cyan-400 transition-all hover:scale-110">RESTART SYSTEM</button>
-    </div>
-</div>
+    <script>
+        let scene, camera, renderer, clock;
+        let isGameActive = false;
+        let isDarkTheme = true;
+        let heroModel, floor, grid;
+        
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let velocity, direction, raycaster;
+        
+        let enemies = [];
+        let health = 200, maxHealth = 200;
+        let ultCharge = 0;
 
-<script>
-let scene, camera, renderer, clock;
-let isDarkMode = true;
-let ambientLight;
-let velocity = new THREE.Vector3(); // Missing velocity variable
-let direction = new THREE.Vector3();
-let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false; // Missing movement states
-let enemies = [];
-let enemyProjectiles = [];
-let score = 0;
-let health = 200;
-let maxHealth = 200;
-let ultCharge = 0;
-let isUltActive = false;
-let dashCooldown = 0;
-let isGameActive = false;
-let spawnTimer = 0;
-
-function init() {
-    scene = new THREE.Scene();
-    updateThemeStyles(); // 초기 테마 설정
-
-    camera = new THREE.Camera();
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.y = 1.7; // Player height
-    camera.rotation.order = 'YXZ';
-
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
-    document.body.appendChild(renderer.domElement);
-
-    clock = new THREE.Clock();
-
-    // Lighting
-    ambientLight = new THREE.AmbientLight(0x404040, 0.5);
-    scene.add(ambientLight);
-
-    const mainLight = new THREE.PointLight(0x00ffff, 1, 100);
-    mainLight.position.set(0, 10, 0);
-    scene.add(mainLight);
-
-    // Floor
-    const gridHelper = new THREE.GridHelper(200, 50, 0x00ffff, 0x002222);
-    scene.add(gridHelper);
-
-    const floorGeo = new THREE.PlaneGeometry(200, 200);
-    const floorMat = new THREE.MeshPhongMaterial({ color: 0x050505 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    scene.add(floor);
-
-    setupControls();
-    window.addEventListener('resize', onWindowResize);
-    document.addEventListener('mousedown', onMouseDown);
-    
-    document.getElementById('theme-toggle').addEventListener('click', (e) => {
-        e.stopPropagation(); // 포인터 락 방해 금지
-        toggleTheme();
-    });
-}
-
-function toggleTheme() {
-    isDarkMode = !isDarkMode;
-    updateThemeStyles();
-    
-    // UI 아이콘 토글
-    const sunIcon = document.getElementById('theme-icon-sun');
-    const moonIcon = document.getElementById('theme-icon-moon');
-    const btn = document.getElementById('theme-toggle');
-
-    if (isDarkMode) {
-        sunIcon.classList.add('hidden');
-        moonIcon.classList.remove('hidden');
-        btn.style.background = "rgba(0, 0, 0, 0.4)";
-    } else {
-        sunIcon.classList.remove('hidden');
-        moonIcon.classList.add('hidden');
-        btn.style.background = "rgba(255, 255, 255, 0.8)";
-    }
-}
-
-function updateThemeStyles() {
-    if (!scene) return;
-
-    if (isDarkMode) {
-        scene.background = new THREE.Color(0x020205);
-        scene.fog = new THREE.FogExp2(0x020205, 0.015);
-        if (ambientLight) ambientLight.intensity = 0.5;
-    } else {
-        // 라이트 모드: 밝은 하늘색 배경과 강한 조명
-        scene.background = new THREE.Color(0xd0e7ff);
-        scene.fog = new THREE.FogExp2(0xd0e7ff, 0.01);
-        if (ambientLight) ambientLight.intensity = 1.5;
-    }
-}
-
-function setupControls() {
-    const instructions = document.getElementById('instructions');
-
-    instructions.addEventListener('click', () => {
-        document.body.requestPointerLock();
-    });
-
-    document.addEventListener('pointerlockchange', () => {
-        if (document.pointerLockElement === document.body) {
-            isGameActive = true;
-            instructions.style.display = 'none';
-        } else {
-            isGameActive = false;
-            if (health > 0) instructions.style.display = 'flex';
-        }
-    });
-
-    const onKeyDown = (event) => {
-        if (!isGameActive) return;
-        switch (event.code) {
-            case 'KeyW': moveForward = true; break;
-            case 'KeyS': moveBackward = true; break;
-            case 'KeyA': moveLeft = true; break;
-            case 'KeyD': moveRight = true; break;
-            case 'ShiftLeft': useDash(); break;
-            case 'KeyQ': useUltimate(); break;
-        }
-    };
-
-    const onKeyUp = (event) => {
-        switch (event.code) {
-            case 'KeyW': moveForward = false; break;
-            case 'KeyS': moveBackward = false; break;
-            case 'KeyA': moveLeft = false; break;
-            case 'KeyD': moveRight = false; break;
-        }
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    document.addEventListener('keyup', onKeyUp);
-
-    document.addEventListener('mousemove', (event) => {
-        if (!isGameActive) return;
-        const movementX = event.movementX || 0;
-        const movementY = event.movementY || 0;
-
-        camera.rotation.y -= movementX * 0.002;
-        camera.rotation.x -= movementY * 0.002;
-        camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
-    });
-}
-
-function useDash() {
-    if (dashCooldown > 0) return;
-    
-    const dashVector = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    dashVector.y = 0;
-    dashVector.normalize().multiplyScalar(40);
-    velocity.add(dashVector);
-    
-    dashCooldown = 5;
-}
-
-function useUltimate() {
-    if (ultCharge < 100 || isUltActive) return;
-    
-    isUltActive = true;
-    ultCharge = 0;
-    
-    document.getElementById('ult-inner').classList.add('bg-yellow-500/60');
-    document.getElementById('crosshair').style.borderColor = "#ffcc00";
-    
-    setTimeout(() => {
-        isUltActive = false;
-        document.getElementById('ult-inner').classList.remove('bg-yellow-500/60');
-        document.getElementById('crosshair').style.borderColor = "rgba(0, 255, 255, 0.7)";
-    }, 8000);
-}
-
-function onMouseDown() {
-    if (!isGameActive) return;
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-    const intersects = raycaster.intersectObjects(enemies);
-
-    if (intersects.length > 0) {
-        hitEnemy(intersects[0].object);
-    }
-}
-
-function hitEnemy(target) {
-    const hitMarker = document.getElementById('hit-marker');
-    hitMarker.style.opacity = "1";
-    setTimeout(() => hitMarker.style.opacity = "0", 100);
-
-    if (!isUltActive) {
-        ultCharge = Math.min(100, ultCharge + 10);
-    }
-
-    removeEnemy(target);
-    score += 100;
-    document.getElementById('score-val').innerText = score;
-    
-    const feed = document.getElementById('kill-feed');
-    const log = document.createElement('div');
-    log.className = "text-sm font-bold text-white mb-1";
-    log.innerHTML = `<span class="text-blue-400">YOU</span> ⚔️ <span class="text-red-500">BOT_${Math.floor(Math.random()*999)}</span>`;
-    feed.prepend(log);
-    setTimeout(() => log.remove(), 3000);
-}
-
-function spawnEnemy() {
-    const geo = new THREE.BoxGeometry(1, 2, 1);
-    const mat = new THREE.MeshPhongMaterial({ 
-        color: 0xff0055, 
-        emissive: 0x330011,
-        shininess: 100 
-    });
-    const enemy = new THREE.Mesh(geo, mat);
-    
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 20 + Math.random() * 20;
-    enemy.position.set(Math.cos(angle) * dist, 1, Math.sin(angle) * dist);
-    
-    scene.add(enemy);
-    enemies.push(enemy);
-}
-
-function removeEnemy(enemy) {
-    scene.remove(enemy);
-    enemies = enemies.filter(e => e !== enemy);
-}
-
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function animate() {
-    requestAnimationFrame(animate);
-    const delta = clock.getDelta();
-
-    if (isGameActive) {
-        // Movement
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
-
-        direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveRight) - Number(moveLeft);
-        direction.normalize();
-
-        if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
-
-        camera.translateX(-velocity.x * delta);
-        camera.translateZ(velocity.z * delta);
-        camera.position.y = 1.7; // Keep on ground
-
-        // UI Updates
-        if (dashCooldown > 0) {
-            dashCooldown -= delta;
-            document.getElementById('dash-cooldown').style.opacity = "1";
-            document.getElementById('dash-cooldown').querySelector('span').innerText = Math.max(0, Math.ceil(dashCooldown)) + "s";
-        } else {
-            document.getElementById('dash-cooldown').style.opacity = "0";
-        }
-
-        document.getElementById('ult-text').innerText = isUltActive ? "ACTIVE" : Math.floor(ultCharge) + "%";
-        document.getElementById('ult-progress').style.background = `conic-gradient(#ffcc00 ${ultCharge}%, transparent 0%)`;
-
-        // Ultimate Auto-Aim
-        if (isUltActive && enemies.length > 0) {
-            let closest = null;
-            let minDist = Infinity;
-            enemies.forEach(e => {
-                const d = e.position.distanceTo(camera.position);
-                if (d < minDist) { minDist = d; closest = e; }
-            });
-            if (closest) {
-                const targetPos = closest.position.clone();
-                camera.lookAt(targetPos);
+        function init() {
+            // 라이브러리 로드 체크
+            if (typeof THREE === 'undefined') {
+                console.error('THREE.js failed to load. Check your internet connection.');
+                document.getElementById('loading-screen').innerText = "ERROR: FAILED TO LOAD LIBRARIES";
+                return;
             }
-        }
 
-        // Enemy AI & Spawning
-        spawnTimer += delta;
-        if (spawnTimer > 2) {
-            spawnEnemy();
-            spawnTimer = 0;
-        }
+            // 객체 생성 지연 처리
+            velocity = new THREE.Vector3();
+            direction = new THREE.Vector3();
+            raycaster = new THREE.Raycaster();
 
-        enemies.forEach(enemy => {
-            const dir = new THREE.Vector3().subVectors(camera.position, enemy.position).normalize();
-            enemy.position.add(dir.multiplyScalar(delta * 3));
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050505);
+            scene.fog = new THREE.FogExp2(0x050505, 0.05);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(5, 2, 8);
+            camera.lookAt(0, 1.5, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            // Lights
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+            scene.add(hemiLight);
+
+            const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            sunLight.position.set(5, 10, 7.5);
+            scene.add(sunLight);
+
+            // Environment
+            grid = new THREE.GridHelper(200, 50, 0x00ffff, 0x111111);
+            scene.add(grid);
+
+            const floorGeo = new THREE.PlaneGeometry(200, 200);
+            const floorMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+            floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            // Menu Hero Preview
+            const heroGeo = new THREE.CapsuleGeometry(0.5, 1, 4, 8);
+            const heroMat = new THREE.MeshPhongMaterial({ color: 0x00ffff, emissive: 0x003333 });
+            heroModel = new THREE.Mesh(heroGeo, heroMat);
+            heroModel.position.set(0, 1, 0);
+            scene.add(heroModel);
+
+            setupControls();
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('mousedown', onShoot);
             
-            // Player hit check
-            if (enemy.position.distanceTo(camera.position) < 1.5) {
-                health -= delta * 50;
-                if (health <= 0) gameOver();
+            // 로딩 화면 제거 및 메뉴 표시
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('main-menu').classList.remove('menu-hidden');
+            
+            animate();
+        }
+
+        function startGame() {
+            // 카메라가 초기화되지 않았으면 실행 방지
+            if (!camera) {
+                console.error("Camera not initialized!");
+                return;
             }
-        });
 
-        const hpBar = document.getElementById('health-bar');
-        hpBar.style.width = (health / maxHealth * 100) + "%";
-        document.getElementById('health').innerText = Math.max(0, Math.floor(health));
-    }
+            isGameActive = true;
+            document.getElementById('main-menu').classList.add('menu-hidden');
+            document.getElementById('hud').classList.add('hud-visible');
+            document.getElementById('crosshair').style.display = 'block';
+            
+            camera.position.set(0, 1.7, 5);
+            camera.rotation.set(0, 0, 0);
+            
+            if (heroModel) scene.remove(heroModel);
+            document.body.requestPointerLock();
+        }
 
-    renderer.render(scene, camera);
-}
+        function toggleTheme(e) {
+            if(e) e.stopPropagation();
+            if(!scene) return;
 
-function gameOver() {
-    isGameActive = false;
-    document.exitPointerLock();
-    document.getElementById('game-over').classList.remove('hidden');
-    document.getElementById('final-score').innerText = `SYSTEM SCORE: ${score}`;
-}
+            isDarkTheme = !isDarkTheme;
+            const iconPath = document.getElementById('icon-path');
+            
+            if (isDarkTheme) {
+                scene.background = new THREE.Color(0x050505);
+                scene.fog.color = new THREE.Color(0x050505);
+                iconPath.setAttribute('d', 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z');
+            } else {
+                scene.background = new THREE.Color(0x87ceeb);
+                scene.fog.color = new THREE.Color(0x87ceeb);
+                iconPath.setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-11.314l.707.707m11.314 11.314l.707.707M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z');
+            }
+        }
 
-window.onload = () => {
-    init();
-    animate();
-};
-</script>
+        function setupControls() {
+            document.addEventListener('keydown', (e) => {
+                switch (e.code) {
+                    case 'KeyW': moveForward = true; break;
+                    case 'KeyS': moveBackward = true; break;
+                    case 'KeyA': moveLeft = true; break;
+                    case 'KeyD': moveRight = true; break;
+                    case 'ShiftLeft': useDash(); break;
+                    case 'KeyQ': useUltimate(); break;
+                }
+            });
+            document.addEventListener('keyup', (e) => {
+                switch (e.code) {
+                    case 'KeyW': moveForward = false; break;
+                    case 'KeyS': moveBackward = false; break;
+                    case 'KeyA': moveLeft = false; break;
+                    case 'KeyD': moveRight = false; break;
+                }
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (document.pointerLockElement === document.body && camera) {
+                    camera.rotation.y -= e.movementX * 0.002;
+                    camera.rotation.x -= e.movementY * 0.002;
+                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                }
+            });
+        }
+
+        function onShoot() {
+            if (!isGameActive || document.pointerLockElement !== document.body || !camera) return;
+            
+            const marker = document.getElementById('hit-marker');
+            raycaster.setFromCamera({x: 0, y: 0}, camera);
+            const intersects = raycaster.intersectObjects(enemies);
+
+            if (intersects.length > 0) {
+                const target = intersects[0].object;
+                marker.style.opacity = '1';
+                setTimeout(() => marker.style.opacity = '0', 100);
+                
+                target.hp -= 50;
+                if (target.hp <= 0) killEnemy(target);
+                
+                ultCharge = Math.min(100, ultCharge + 10);
+                updateHUD();
+            }
+        }
+
+        function spawnEnemy() {
+            const geo = new THREE.BoxGeometry(1, 2, 1);
+            const mat = new THREE.MeshPhongMaterial({ color: 0xff4444 });
+            const enemy = new THREE.Mesh(geo, mat);
+            
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 20 + Math.random() * 10;
+            enemy.position.set(Math.cos(angle) * dist, 1, Math.sin(angle) * dist);
+            enemy.hp = 100;
+            
+            scene.add(enemy);
+            enemies.push(enemy);
+        }
+
+        function killEnemy(enemy) {
+            const index = enemies.indexOf(enemy);
+            if (index > -1) {
+                scene.remove(enemy);
+                enemies.splice(index, 1);
+                
+                const feed = document.getElementById('kill-feed');
+                const item = document.createElement('div');
+                item.className = 'kill-item';
+                item.innerText = 'TARGET ELIMINATED +100';
+                feed.appendChild(item);
+                setTimeout(() => item.remove(), 3000);
+            }
+        }
+
+        function useDash() {
+            if (!isGameActive || !velocity) return;
+            velocity.z += 60;
+        }
+
+        function useUltimate() {
+            if (ultCharge < 100) return;
+            ultCharge = 0;
+            updateHUD();
+            [...enemies].forEach(t => killEnemy(t));
+        }
+
+        function updateHUD() {
+            document.getElementById('health-bar').style.width = `${(health / maxHealth) * 100}%`;
+            document.getElementById('health-text').innerText = `HP ${Math.ceil(health)} / ${maxHealth}`;
+            document.getElementById('ult-progress').style.height = `${ultCharge}%`;
+        }
+
+        function onWindowResize() {
+            if(!camera) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function showSoon() {
+            const feed = document.getElementById('kill-feed');
+            const item = document.createElement('div');
+            item.className = 'kill-item';
+            item.innerText = 'FEATURE COMING SOON';
+            feed.appendChild(item);
+            setTimeout(() => item.remove(), 2000);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if(!clock || !renderer || !scene || !camera) return;
+
+            const delta = clock.getDelta();
+
+            if (isGameActive) {
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * 50.0 * delta;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 50.0 * delta;
+
+                camera.translateX(-velocity.x * delta);
+                camera.translateZ(velocity.z * delta);
+                camera.position.y = 1.7;
+
+                velocity.multiplyScalar(0.9);
+
+                // Enemy AI
+                enemies.forEach(enemy => {
+                    const dir = new THREE.Vector3().subVectors(camera.position, enemy.position).normalize();
+                    enemy.position.add(dir.multiplyScalar(delta * 4));
+                    enemy.lookAt(camera.position);
+                    
+                    if (enemy.position.distanceTo(camera.position) < 1.5) {
+                        health -= 15 * delta;
+                        updateHUD();
+                        if (health <= 0) location.reload();
+                    }
+                });
+
+                if (Math.random() < 0.01 && enemies.length < 10) spawnEnemy();
+            } else {
+                // Menu Background Rotation
+                if (heroModel) {
+                    const time = Date.now() * 0.0005;
+                    camera.position.x = Math.cos(time) * 7;
+                    camera.position.z = Math.sin(time) * 7;
+                    camera.lookAt(0, 1.5, 0);
+                    heroModel.rotation.y += 0.01;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // 윈도우 로드 시 실행
+        window.onload = init;
+    </script>
 </body>
 </html>
