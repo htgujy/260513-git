@@ -87,11 +87,49 @@
             align-items: center;
             justify-content: center;
         }
+
+        #theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 150px; /* Kill feed와 겹치지 않게 조절 */
+            z-index: 70;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 45px;
+            height: 45px;
+        }
+        #theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.1);
+        }
+        #theme-toggle svg {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
     </style>
 </head>
 <body>
 
 <div id="ui-container">
+    <button id="theme-toggle" title="Toggle Brightness">
+        <svg id="theme-icon-sun" class="hidden text-yellow-400" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        <svg id="theme-icon-moon" class="text-indigo-300" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+    </button>
+
     <div id="crosshair"></div>
     <div id="hit-marker">╳</div>
     
@@ -153,9 +191,11 @@
 
 <script>
 let scene, camera, renderer, clock;
-let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-let velocity = new THREE.Vector3();
+let isDarkMode = true;
+let ambientLight;
+let velocity = new THREE.Vector3(); // Missing velocity variable
 let direction = new THREE.Vector3();
+let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false; // Missing movement states
 let enemies = [];
 let enemyProjectiles = [];
 let score = 0;
@@ -169,8 +209,7 @@ let spawnTimer = 0;
 
 function init() {
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020205);
-    scene.fog = new THREE.FogExp2(0x020205, 0.015);
+    updateThemeStyles(); // 초기 테마 설정
 
     camera = new THREE.Camera();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -185,7 +224,7 @@ function init() {
     clock = new THREE.Clock();
 
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+    ambientLight = new THREE.AmbientLight(0x404040, 0.5);
     scene.add(ambientLight);
 
     const mainLight = new THREE.PointLight(0x00ffff, 1, 100);
@@ -205,6 +244,46 @@ function init() {
     setupControls();
     window.addEventListener('resize', onWindowResize);
     document.addEventListener('mousedown', onMouseDown);
+    
+    document.getElementById('theme-toggle').addEventListener('click', (e) => {
+        e.stopPropagation(); // 포인터 락 방해 금지
+        toggleTheme();
+    });
+}
+
+function toggleTheme() {
+    isDarkMode = !isDarkMode;
+    updateThemeStyles();
+    
+    // UI 아이콘 토글
+    const sunIcon = document.getElementById('theme-icon-sun');
+    const moonIcon = document.getElementById('theme-icon-moon');
+    const btn = document.getElementById('theme-toggle');
+
+    if (isDarkMode) {
+        sunIcon.classList.add('hidden');
+        moonIcon.classList.remove('hidden');
+        btn.style.background = "rgba(0, 0, 0, 0.4)";
+    } else {
+        sunIcon.classList.remove('hidden');
+        moonIcon.classList.add('hidden');
+        btn.style.background = "rgba(255, 255, 255, 0.8)";
+    }
+}
+
+function updateThemeStyles() {
+    if (!scene) return;
+
+    if (isDarkMode) {
+        scene.background = new THREE.Color(0x020205);
+        scene.fog = new THREE.FogExp2(0x020205, 0.015);
+        if (ambientLight) ambientLight.intensity = 0.5;
+    } else {
+        // 라이트 모드: 밝은 하늘색 배경과 강한 조명
+        scene.background = new THREE.Color(0xd0e7ff);
+        scene.fog = new THREE.FogExp2(0xd0e7ff, 0.01);
+        if (ambientLight) ambientLight.intensity = 1.5;
+    }
 }
 
 function setupControls() {
