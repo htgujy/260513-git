@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Hero FPS - Hero Selection</title>
+    <title>Cyber Hero FPS - Ultimate Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
     <style>
@@ -12,252 +12,215 @@
         body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background: #050505; color: white; }
         canvas { display: block; }
 
-        /* UI Containers */
         #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-
-        /* Screens */
         .screen {
             position: absolute; width: 100%; height: 100%;
-            display: flex; flex-direction: column; transition: opacity 0.4s ease, transform 0.4s ease;
+            display: flex; flex-direction: column; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             pointer-events: auto;
         }
         .hidden-screen { opacity: 0; pointer-events: none; transform: scale(1.1); }
 
-        /* Main Menu */
-        #main-menu {
-            background: radial-gradient(circle at 20% 50%, rgba(0,0,0,0.8) 0%, transparent 100%);
-            justify-content: center; padding-left: 8%;
-        }
-
-        /* Hero Selection */
-        #hero-menu {
-            background: rgba(0, 0, 0, 0.9);
-            justify-content: center; align-items: center;
-        }
+        #main-menu { background: radial-gradient(circle at 15% 50%, rgba(0,0,0,0.7) 0%, transparent 100%); justify-content: center; padding-left: 8%; }
+        #hero-menu { background: rgba(0, 0, 0, 0.9); justify-content: center; align-items: center; backdrop-filter: blur(15px); }
 
         #game-logo {
-            font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 5rem;
-            line-height: 1; margin-bottom: 2rem; text-transform: uppercase;
-            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 5.5rem;
+            line-height: 0.9; margin-bottom: 2.5rem; text-transform: uppercase;
+            text-shadow: 0 0 30px rgba(0, 255, 255, 0.5); letter-spacing: -3px;
         }
 
         .menu-btn {
-            font-family: 'Orbitron', sans-serif; font-size: 1.5rem; color: #ccc;
-            margin: 10px 0; cursor: pointer; transition: all 0.2s;
+            font-family: 'Orbitron', sans-serif; font-size: 1.4rem; color: #888;
+            margin: 10px 0; cursor: pointer; transition: all 0.3s;
             position: relative; padding-left: 0; text-transform: uppercase; letter-spacing: 2px;
         }
-        .menu-btn:hover { color: #fff; padding-left: 20px; text-shadow: 0 0 10px #0ff; }
+        .menu-btn:hover { color: #fff; padding-left: 30px; text-shadow: 0 0 15px #0ff; }
+        .menu-btn::before { content: '▶'; position: absolute; left: 0; opacity: 0; transition: 0.3s; font-size: 1rem; top: 50%; transform: translateY(-50%); }
+        .menu-btn:hover::before { opacity: 1; }
 
-        /* Hero Cards */
-        .hero-grid { display: flex; gap: 20px; margin-top: 30px; }
+        .hero-grid { display: flex; gap: 30px; margin-top: 40px; }
         .hero-card {
-            width: 220px; height: 350px; background: rgba(255,255,255,0.05);
-            border: 2px solid rgba(255,255,255,0.1); border-radius: 20px;
+            width: 260px; height: 400px; background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            cursor: pointer; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            position: relative; overflow: hidden;
+            cursor: pointer; transition: all 0.4s; position: relative;
         }
-        .hero-card:hover { transform: translateY(-15px); border-color: #0ff; background: rgba(0, 255, 255, 0.1); }
-        .hero-card.selected { border-color: #0ff; box-shadow: 0 0 30px rgba(0, 255, 255, 0.3); background: rgba(0, 255, 255, 0.15); }
-        
-        .hero-name { font-family: 'Orbitron', sans-serif; font-weight: bold; font-size: 1.5rem; margin-top: 15px; }
-        .hero-stat { font-size: 0.8rem; color: #aaa; margin-top: 5px; }
+        .hero-card:hover { transform: translateY(-15px); border-color: #0ff; background: rgba(0, 255, 255, 0.05); }
+        .hero-card.selected { border-color: #0ff; box-shadow: 0 0 50px rgba(0, 255, 255, 0.3); background: rgba(0, 255, 255, 0.1); }
+        .hero-name { font-family: 'Orbitron', sans-serif; font-weight: bold; font-size: 2rem; margin-top: 25px; letter-spacing: 1px; }
 
-        /* HUD */
-        #hud {
-            position: absolute; bottom: 0; width: 100%; height: 150px;
-            display: none; justify-content: space-between; align-items: flex-end;
-            padding: 0 50px 30px 50px;
-        }
-        .hud-visible { display: flex !important; }
+        #hud { position: absolute; bottom: 0; width: 100%; height: 200px; display: none; justify-content: space-between; align-items: flex-end; padding: 0 80px 50px 80px; }
+        .hud-visible { display: flex !important; animation: fadeIn 0.8s forwards; }
 
-        .health-container {
-            width: 300px; background: rgba(0, 0, 0, 0.5);
-            border-left: 8px solid #fff; padding: 10px; transform: skewX(-15deg);
-        }
-        #health-bar { height: 20px; background: #fff; width: 100%; transition: width 0.3s; }
+        .health-container { width: 350px; background: rgba(0, 0, 0, 0.6); border-left: 12px solid #fff; padding: 15px; transform: skewX(-15deg); box-shadow: -15px 15px 30px rgba(0,0,0,0.5); }
+        #health-bar { height: 28px; background: #fff; width: 100%; transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
 
         .ult-container {
-            position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
-            width: 120px; height: 120px; border-radius: 50%;
-            background: rgba(0, 0, 0, 0.6); border: 4px solid rgba(255, 255, 255, 0.2);
+            position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%);
+            width: 140px; height: 140px; border-radius: 50%;
+            background: rgba(0, 0, 0, 0.8); border: 4px solid rgba(255, 255, 255, 0.1);
             display: flex; align-items: center; justify-content: center; overflow: hidden;
         }
-        #ult-progress {
-            position: absolute; bottom: 0; width: 100%; height: 0%;
-            background: #0ff; opacity: 0.5; transition: height 0.3s;
-        }
-        #ult-icon { z-index: 2; font-size: 2.5rem; font-weight: 900; color: #fff; text-shadow: 0 0 10px #0ff; }
+        #ult-progress { position: absolute; bottom: 0; width: 100%; height: 0%; background: #0ff; opacity: 0.7; transition: height 0.3s; }
+        #ult-icon { z-index: 2; font-family: 'Orbitron'; font-size: 3rem; font-weight: 900; color: #fff; text-shadow: 0 0 20px #0ff; }
 
-        #theme-toggle {
-            position: absolute; top: 20px; right: 20px;
-            width: 50px; height: 50px; background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px); border-radius: 12px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; pointer-events: auto; z-index: 100;
-        }
+        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; display: none; pointer-events: none; mix-blend-mode: difference; }
+        #hit-marker { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff4444; font-size: 3.5rem; opacity: 0; pointer-events: none; transition: opacity 0.1s; font-weight: bold; }
+        
+        #kill-feed { position: absolute; top: 120px; right: 40px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .kill-item { background: rgba(0, 0, 0, 0.85); color: white; padding: 8px 25px; border-right: 6px solid #0ff; animation: slideIn 0.3s forwards; font-size: 0.9rem; font-weight: 800; font-family: 'Orbitron'; }
+        
+        #theme-toggle { position: absolute; top: 40px; right: 40px; width: 60px; height: 60px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border-radius: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto; z-index: 100; border: 1px solid rgba(255,255,255,0.2); transition: 0.3s; }
+        #theme-toggle:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }
 
-        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 30px; height: 30px; display: none; }
-        #hit-marker { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #ff4444; font-size: 2.5rem; opacity: 0; pointer-events: none; }
-        #kill-feed { position: absolute; top: 80px; right: 20px; display: flex; flex-direction: column; gap: 5px; }
-        .kill-item { background: rgba(0, 0, 0, 0.7); color: white; padding: 5px 15px; border-right: 4px solid #0ff; animation: slideIn 0.3s forwards; font-size: 0.8rem; }
-        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes slideIn { from { transform: translateX(150%); } to { transform: translateX(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        #loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; display: flex; align-items: center; justify-content: center; z-index: 1000; font-family: 'Orbitron', sans-serif; }
+        #loading-overlay { position: fixed; inset: 0; background: #050505; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: 'Orbitron'; letter-spacing: 8px; font-size: 1.5rem; transition: opacity 0.8s; }
     </style>
 </head>
 <body>
 
-    <div id="loading-screen">LOADING SYSTEM...</div>
+    <div id="loading-overlay">SYNCHRONIZING...</div>
 
     <div id="ui-container">
-        <!-- Theme Toggle -->
         <div id="theme-toggle" onclick="toggleTheme(event)">
-            <svg id="theme-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="white" stroke-width="2">
+            <svg id="theme-icon" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="white" stroke-width="2">
                 <path id="icon-path" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
         </div>
 
-        <!-- Main Menu -->
         <div id="main-menu" class="screen">
             <div id="game-logo">NEON<br>STRIKE</div>
             <div class="flex flex-col">
-                <div class="menu-btn" onclick="startGame()">▶ Play</div>
-                <div class="menu-btn" onclick="showHeroMenu()">👤 Heroes</div>
-                <div class="menu-btn" onclick="showSoon()">Settings</div>
+                <div class="menu-btn" onclick="startGame()">Play Mission</div>
+                <div class="menu-btn" onclick="showHeroMenu()">Select Agent</div>
+                <div class="menu-btn" onclick="showSoon()">Archives</div>
             </div>
         </div>
 
-        <!-- Hero Selection Menu -->
         <div id="hero-menu" class="screen hidden-screen">
-            <h2 class="font-['Orbitron'] text-4xl mb-8">SELECT YOUR HERO</h2>
+            <h2 class="font-['Orbitron'] text-6xl mb-16 tracking-tighter font-black">DEPLOY AGENT</h2>
             <div class="hero-grid">
                 <div class="hero-card" onclick="selectHero('neon')" id="card-neon">
-                    <div class="w-20 h-20 bg-cyan-400 rounded-full shadow-[0_0_20px_rgba(34,211,238,0.5)]"></div>
+                    <div class="w-28 h-28 bg-cyan-400 rounded-full shadow-[0_0_40px_rgba(34,211,238,0.7)]"></div>
                     <div class="hero-name">NEON</div>
-                    <div class="hero-stat">HP: 200 | SPD: FAST</div>
-                    <div class="hero-stat italic text-cyan-400">"Light speed strike."</div>
+                    <div class="text-gray-400 mt-4 text-sm font-bold uppercase tracking-widest">Balanced Class</div>
                 </div>
                 <div class="hero-card" onclick="selectHero('titan')" id="card-titan">
-                    <div class="w-20 h-20 bg-orange-500 rounded-full shadow-[0_0_20px_rgba(249,115,22,0.5)]"></div>
+                    <div class="w-28 h-28 bg-orange-500 rounded-full shadow-[0_0_40px_rgba(249,115,22,0.7)]"></div>
                     <div class="hero-name">TITAN</div>
-                    <div class="hero-stat">HP: 400 | SPD: SLOW</div>
-                    <div class="hero-stat italic text-orange-400">"Immovable object."</div>
+                    <div class="text-gray-400 mt-4 text-sm font-bold uppercase tracking-widest">Heavy Tanker</div>
                 </div>
                 <div class="hero-card" onclick="selectHero('wind')" id="card-wind">
-                    <div class="w-20 h-20 bg-lime-400 rounded-full shadow-[0_0_20px_rgba(163,230,53,0.5)]"></div>
+                    <div class="w-28 h-28 bg-lime-400 rounded-full shadow-[0_0_40px_rgba(163,230,53,0.7)]"></div>
                     <div class="hero-name">WIND</div>
-                    <div class="hero-stat">HP: 150 | SPD: BREEZE</div>
-                    <div class="hero-stat italic text-lime-400">"Catch me if you can."</div>
+                    <div class="text-gray-400 mt-4 text-sm font-bold uppercase tracking-widest">Elite Scout</div>
                 </div>
             </div>
-            <div class="menu-btn mt-12" onclick="backToMain()">↩ Back</div>
+            <div class="menu-btn mt-20" onclick="backToMain()">↩ Return to HQ</div>
         </div>
 
-        <!-- In-Game HUD -->
         <div id="hud">
             <div class="health-container">
-                <div id="hero-tag" class="text-[10px] font-bold text-cyan-400 uppercase tracking-tighter mb-1">HERO: NEON</div>
-                <div id="health-text" class="text-white text-[10px] font-bold mb-1">HP 200 / 200</div>
+                <div id="hero-tag" class="text-[14px] font-black text-cyan-400 uppercase tracking-widest mb-2">AGENT: NEON</div>
                 <div id="health-bar"></div>
             </div>
             <div class="ult-container">
                 <div id="ult-progress"></div>
                 <div id="ult-icon">Q</div>
             </div>
-            <div class="flex gap-4 transform skewX(-15deg)">
-                <div class="w-16 h-16 bg-black/60 border-2 border-white flex items-center justify-center text-[10px]">SHIFT</div>
+            <div class="transform skewX(-15deg) bg-white/10 px-8 py-4 border-2 border-white/20">
+                <div class="text-[10px] text-gray-400 font-bold uppercase">Ability</div>
+                <div class="text-xl font-black">DASH [L-SHIFT]</div>
             </div>
         </div>
 
         <div id="crosshair">
             <svg viewBox="0 0 100 100" class="w-full h-full stroke-cyan-400 stroke-[5] fill-none">
-                <circle cx="50" cy="50" r="8" /><line x1="50" y1="20" x2="50" y2="35" /><line x1="50" y1="65" x2="50" y2="80" /><line x1="20" y1="50" x2="35" y2="50" /><line x1="65" y1="50" x2="80" y2="50" />
+                <circle cx="50" cy="50" r="8" opacity="0.4" />
+                <path d="M50 10 V35 M50 65 V90 M10 50 H35 M65 50 H90" />
             </svg>
         </div>
-
         <div id="hit-marker">╳</div>
         <div id="kill-feed"></div>
 
-        <!-- Defeated Screen -->
-        <div id="game-over" class="fixed inset-0 bg-black/90 z-[100] flex flex-col items-center justify-center hidden">
-            <h2 class="font-['Orbitron'] text-6xl text-red-500 mb-8 tracking-tighter">DEFEATED</h2>
-            <div class="menu-btn" onclick="resetGame()">Try Again</div>
-            <div class="menu-btn" onclick="location.reload()">Main Menu</div>
+        <div id="game-over" class="fixed inset-0 bg-black/98 z-[500] flex flex-col items-center justify-center hidden">
+            <h2 class="font-['Orbitron'] text-8xl text-red-600 mb-4 tracking-tighter font-black">CRITICAL ERROR</h2>
+            <p class="text-gray-500 mb-16 tracking-[1em] uppercase text-sm">Agent bio-signs neutralized</p>
+            <div class="flex gap-12">
+                <div class="menu-btn" onclick="resetGame()">Try Again</div>
+                <div class="menu-btn" onclick="location.reload()">Main Terminal</div>
+            </div>
         </div>
     </div>
 
     <script>
-        let scene, camera, renderer, clock;
-        let isGameActive = false;
-        let isDarkTheme = true;
-        let heroModel, floor, grid;
+        let scene, camera, renderer, clock, raycaster;
+        let isGameActive = false, isDarkTheme = true;
+        let heroPreviewModel, ambientLight, sunLight, floor, grid;
         
         let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-        let velocity, direction, raycaster;
+        let velocity, direction;
         
-        let enemies = [];
-        let health = 200, maxHealth = 200;
-        let ultCharge = 0;
-
+        let enemies = [], health = 200, maxHealth = 200, ultCharge = 0;
         const heroes = {
-            neon: { name: 'NEON', hp: 200, color: 0x00ffff, speed: 50, dash: 60 },
-            titan: { name: 'TITAN', hp: 400, color: 0xffa500, speed: 30, dash: 30 },
-            wind: { name: 'WIND', hp: 150, color: 0xccff00, speed: 75, dash: 90 }
+            neon: { name: 'NEON', hp: 200, color: 0x00ffff, speed: 60, dash: 70 },
+            titan: { name: 'TITAN', hp: 450, color: 0xffa500, speed: 35, dash: 30 },
+            wind: { name: 'WIND', hp: 140, color: 0xccff00, speed: 85, dash: 100 }
         };
         let currentHero = heroes.neon;
 
         function init() {
             if (typeof THREE === 'undefined') return;
 
-            velocity = new THREE.Vector3();
-            direction = new THREE.Vector3();
-            raycaster = new THREE.Raycaster();
-
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x050505);
-            scene.fog = new THREE.FogExp2(0x050505, 0.05);
+            scene.background = new THREE.Color(0x0a0a0a);
+            scene.fog = new THREE.Fog(0x0a0a0a, 10, 100);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(5, 2, 8);
-            camera.lookAt(0, 1.5, 0);
-
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
             clock = new THREE.Clock();
+            velocity = new THREE.Vector3();
+            direction = new THREE.Vector3();
+            raycaster = new THREE.Raycaster();
 
-            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-            scene.add(hemiLight);
-
-            const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            sunLight.position.set(5, 10, 7.5);
+            // Bright Lighting Setup
+            ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            sunLight.position.set(20, 50, 20);
+            sunLight.castShadow = true;
             scene.add(sunLight);
 
-            grid = new THREE.GridHelper(200, 50, 0x00ffff, 0x111111);
+            // Ground & Grid
+            grid = new THREE.GridHelper(500, 100, 0x00ffff, 0x222222);
             scene.add(grid);
-
-            const floorGeo = new THREE.PlaneGeometry(200, 200);
+            const floorGeo = new THREE.PlaneGeometry(1000, 1000);
             const floorMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
             floor = new THREE.Mesh(floorGeo, floorMat);
             floor.rotation.x = -Math.PI / 2;
             floor.receiveShadow = true;
             scene.add(floor);
 
-            const heroGeo = new THREE.CapsuleGeometry(0.5, 1, 4, 8);
-            const heroMat = new THREE.MeshPhongMaterial({ color: currentHero.color, emissive: currentHero.color, emissiveIntensity: 0.5 });
-            heroModel = new THREE.Mesh(heroGeo, heroMat);
-            heroModel.position.set(0, 1, 0);
-            scene.add(heroModel);
+            // Hero Model for Menu
+            const geo = new THREE.CapsuleGeometry(0.7, 1.5, 4, 16);
+            const mat = new THREE.MeshPhongMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 });
+            heroPreviewModel = new THREE.Mesh(geo, mat);
+            heroPreviewModel.position.set(0, 1.6, 0);
+            scene.add(heroPreviewModel);
 
             setupControls();
             window.addEventListener('resize', onWindowResize);
-            document.addEventListener('mousedown', onShoot);
+            document.getElementById('loading-overlay').style.opacity = '0';
+            setTimeout(() => document.getElementById('loading-overlay').remove(), 800);
             
-            document.getElementById('loading-screen').style.display = 'none';
-            selectHero('neon'); // Default
+            selectHero('neon');
             animate();
         }
 
@@ -275,34 +238,27 @@
             currentHero = heroes[id];
             maxHealth = currentHero.hp;
             health = maxHealth;
-            
-            // UI Update
             document.querySelectorAll('.hero-card').forEach(c => c.classList.remove('selected'));
             document.getElementById(`card-${id}`).classList.add('selected');
             
-            // Model Update
-            if(heroModel) {
-                heroModel.material.color.setHex(currentHero.color);
-                heroModel.material.emissive.setHex(currentHero.color);
+            if (heroPreviewModel) {
+                heroPreviewModel.material.color.setHex(currentHero.color);
+                heroPreviewModel.material.emissive.setHex(currentHero.color);
             }
-
-            // HUD Tag
-            document.getElementById('hero-tag').innerText = `HERO: ${currentHero.name}`;
-            document.getElementById('hero-tag').style.color = `#${currentHero.color.toString(16).padStart(6, '0')}`;
             updateHUD();
         }
 
         function startGame() {
-            if (!camera) return;
             isGameActive = true;
             document.getElementById('main-menu').classList.add('hidden-screen');
-            document.getElementById('hero-menu').classList.add('hidden-screen');
             document.getElementById('hud').classList.add('hud-visible');
             document.getElementById('crosshair').style.display = 'block';
             
-            camera.position.set(0, 1.7, 5);
+            // CRITICAL: Reset camera position and rotation to prevent jumps
+            camera.position.set(0, 1.8, 5);
             camera.rotation.set(0, 0, 0);
-            if (heroModel) scene.remove(heroModel);
+            if (heroPreviewModel) scene.remove(heroPreviewModel);
+            
             document.body.requestPointerLock();
         }
 
@@ -317,49 +273,47 @@
                 const target = intersects[0].object;
                 marker.style.opacity = '1';
                 setTimeout(() => marker.style.opacity = '0', 100);
-                
-                target.hp -= 50;
+                target.hp -= 35;
                 if (target.hp <= 0) killEnemy(target);
-                
                 ultCharge = Math.min(100, ultCharge + 10);
                 updateHUD();
             }
         }
 
         function spawnEnemy() {
-            const geo = new THREE.BoxGeometry(1, 2, 1);
-            const mat = new THREE.MeshPhongMaterial({ color: 0xff4444 });
+            const geo = new THREE.BoxGeometry(1.5, 2.5, 1.5);
+            const mat = new THREE.MeshPhongMaterial({ color: 0xff4444, emissive: 0xff0000, emissiveIntensity: 0.3 });
             const enemy = new THREE.Mesh(geo, mat);
-            
             const angle = Math.random() * Math.PI * 2;
-            const dist = 20 + Math.random() * 10;
-            enemy.position.set(Math.cos(angle) * dist, 1, Math.sin(angle) * dist);
+            const dist = 30 + Math.random() * 20;
+            enemy.position.set(Math.cos(angle) * dist, 1.25, Math.sin(angle) * dist);
             enemy.hp = 100;
-            
             scene.add(enemy);
             enemies.push(enemy);
         }
 
         function killEnemy(enemy) {
-            const index = enemies.indexOf(enemy);
-            if (index > -1) {
+            const idx = enemies.indexOf(enemy);
+            if (idx > -1) {
                 scene.remove(enemy);
-                enemies.splice(index, 1);
+                enemies.splice(idx, 1);
                 const feed = document.getElementById('kill-feed');
                 const item = document.createElement('div');
                 item.className = 'kill-item';
-                item.innerText = `${currentHero.name} ELIMINATED TARGET +100`;
-                feed.appendChild(item);
+                item.innerHTML = `AGENT <span style="color:#${currentHero.color.toString(16)}">${currentHero.name}</span> ▶ HOSTILE`;
+                feed.prepend(item);
                 setTimeout(() => item.remove(), 3000);
             }
         }
 
-        function handlePlayerDeath() {
-            isGameActive = false;
-            document.exitPointerLock();
-            document.getElementById('game-over').classList.remove('hidden');
-            document.getElementById('hud').classList.remove('hud-visible');
-            document.getElementById('crosshair').style.display = 'none';
+        function updateHUD() {
+            const bar = document.getElementById('health-bar');
+            bar.style.width = `${(health / maxHealth) * 100}%`;
+            bar.style.background = isDarkTheme ? '#fff' : '#111';
+            const tag = document.getElementById('hero-tag');
+            tag.innerText = `AGENT: ${currentHero.name}`;
+            tag.style.color = `#${currentHero.color.toString(16).padStart(6, '0')}`;
+            document.getElementById('ult-progress').style.height = `${ultCharge}%`;
         }
 
         function resetGame() {
@@ -371,70 +325,63 @@
             document.getElementById('game-over').classList.add('hidden');
             document.getElementById('hud').classList.add('hud-visible');
             document.getElementById('crosshair').style.display = 'block';
-            camera.position.set(0, 1.7, 5);
+            camera.position.set(0, 1.8, 5);
+            camera.rotation.set(0, 0, 0);
             updateHUD();
             document.body.requestPointerLock();
         }
 
-        function useDash() {
-            if (!isGameActive) return;
-            velocity.z += currentHero.dash;
-        }
-
-        function useUltimate() {
-            if (ultCharge < 100) return;
-            ultCharge = 0;
-            updateHUD();
-            [...enemies].forEach(t => killEnemy(t));
-        }
-
-        function updateHUD() {
-            document.getElementById('health-bar').style.width = `${(health / maxHealth) * 100}%`;
-            document.getElementById('health-text').innerText = `HP ${Math.ceil(health)} / ${maxHealth}`;
-            document.getElementById('ult-progress').style.height = `${ultCharge}%`;
-        }
-
         function setupControls() {
             document.addEventListener('keydown', (e) => {
-                switch (e.code) {
-                    case 'KeyW': moveForward = true; break;
-                    case 'KeyS': moveBackward = true; break;
-                    case 'KeyA': moveLeft = true; break;
-                    case 'KeyD': moveRight = true; break;
-                    case 'ShiftLeft': useDash(); break;
-                    case 'KeyQ': useUltimate(); break;
+                if (e.code === 'KeyW') moveForward = true;
+                if (e.code === 'KeyS') moveBackward = true;
+                if (e.code === 'KeyA') moveLeft = true;
+                if (e.code === 'KeyD') moveRight = true;
+                if (e.code === 'ShiftLeft' && isGameActive) {
+                    const dashDir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+                    velocity.add(dashDir.multiplyScalar(currentHero.dash));
+                }
+                if (e.code === 'KeyQ' && ultCharge >= 100) {
+                    ultCharge = 0; updateHUD();
+                    [...enemies].forEach(e => killEnemy(e));
                 }
             });
             document.addEventListener('keyup', (e) => {
-                switch (e.code) {
-                    case 'KeyW': moveForward = false; break;
-                    case 'KeyS': moveBackward = false; break;
-                    case 'KeyA': moveLeft = false; break;
-                    case 'KeyD': moveRight = false; break;
-                }
+                if (e.code === 'KeyW') moveForward = false;
+                if (e.code === 'KeyS') moveBackward = false;
+                if (e.code === 'KeyA') moveLeft = false;
+                if (e.code === 'KeyD') moveRight = false;
             });
             document.addEventListener('mousemove', (e) => {
-                if (document.pointerLockElement === document.body && camera) {
-                    camera.rotation.y -= e.movementX * 0.002;
-                    camera.rotation.x -= e.movementY * 0.002;
-                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                if (document.pointerLockElement === document.body && isGameActive) {
+                    // Optimized camera rotation sensitivity
+                    camera.rotation.y -= e.movementX * 0.0015;
+                    camera.rotation.x -= e.movementY * 0.0015;
+                    camera.rotation.x = Math.max(-Math.PI/2.1, Math.min(Math.PI/2.1, camera.rotation.x));
+                    camera.rotation.order = 'YXZ'; // Important for FPS controls
                 }
             });
+            document.addEventListener('mousedown', onShoot);
         }
 
         function toggleTheme(e) {
             e.stopPropagation();
             isDarkTheme = !isDarkTheme;
-            const iconPath = document.getElementById('icon-path');
+            const icon = document.getElementById('icon-path');
             if (isDarkTheme) {
-                scene.background.setHex(0x050505);
-                scene.fog.color.setHex(0x050505);
-                iconPath.setAttribute('d', 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z');
+                scene.background.setHex(0x0a0a0a);
+                scene.fog.color.setHex(0x0a0a0a);
+                floor.material.color.setHex(0x111111);
+                ambientLight.intensity = 0.8;
+                icon.setAttribute('d', 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z');
             } else {
-                scene.background.setHex(0x87ceeb);
-                scene.fog.color.setHex(0x87ceeb);
-                iconPath.setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-11.314l.707.707m11.314 11.314l.707.707M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z');
+                scene.background.setHex(0xbae6fd);
+                scene.fog.color.setHex(0xbae6fd);
+                floor.material.color.setHex(0xeeeeee);
+                ambientLight.intensity = 1.2;
+                icon.setAttribute('d', 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-11.314l.707.707m11.314 11.314l.707.707M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z');
             }
+            updateHUD();
         }
 
         function onWindowResize() {
@@ -444,19 +391,19 @@
         }
 
         function showSoon() {
-            const feed = document.getElementById('kill-feed');
             const item = document.createElement('div');
             item.className = 'kill-item';
-            item.innerText = 'NOT AVAILABLE IN DEMO';
-            feed.appendChild(item);
+            item.innerText = 'ACCESS DENIED: DATA CORRUPTED';
+            document.getElementById('kill-feed').prepend(item);
             setTimeout(() => item.remove(), 2000);
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            const delta = clock.getDelta();
+            const delta = Math.min(clock.getDelta(), 0.1);
 
             if (isGameActive) {
+                // Movement Handling
                 direction.z = Number(moveForward) - Number(moveBackward);
                 direction.x = Number(moveRight) - Number(moveLeft);
                 direction.normalize();
@@ -466,29 +413,35 @@
 
                 camera.translateX(-velocity.x * delta);
                 camera.translateZ(velocity.z * delta);
-                camera.position.y = 1.7;
+                camera.position.y = 1.8;
                 velocity.multiplyScalar(0.9);
 
+                // Enemy AI
                 enemies.forEach(enemy => {
                     const dir = new THREE.Vector3().subVectors(camera.position, enemy.position).normalize();
-                    enemy.position.add(dir.multiplyScalar(delta * 4));
+                    enemy.position.add(dir.multiplyScalar(delta * 6));
                     enemy.lookAt(camera.position);
-                    if (enemy.position.distanceTo(camera.position) < 1.5) {
-                        health -= 25 * delta;
+                    if (enemy.position.distanceTo(camera.position) < 2) {
+                        health -= 50 * delta;
                         updateHUD();
-                        if (health <= 0) handlePlayerDeath();
+                        if (health <= 0) {
+                            isGameActive = false;
+                            document.exitPointerLock();
+                            document.getElementById('game-over').classList.remove('hidden');
+                        }
                     }
                 });
 
-                if (Math.random() < 0.01 && enemies.length < 10) spawnEnemy();
+                if (Math.random() < 0.02 && enemies.length < 15) spawnEnemy();
             } else {
-                // Menu Rotation
-                if (heroModel) {
-                    const time = Date.now() * 0.0005;
-                    camera.position.x = Math.cos(time) * 7;
-                    camera.position.z = Math.sin(time) * 7;
-                    camera.lookAt(0, 1.5, 0);
-                    heroModel.rotation.y += 0.01;
+                // Cinematic Orbit Camera in Menu
+                const time = Date.now() * 0.0005;
+                if (heroPreviewModel) {
+                    camera.position.x = Math.cos(time) * 10;
+                    camera.position.z = Math.sin(time) * 10;
+                    camera.position.y = 3;
+                    camera.lookAt(0, 1.6, 0);
+                    heroPreviewModel.rotation.y += 0.01;
                 }
             }
             renderer.render(scene, camera);
