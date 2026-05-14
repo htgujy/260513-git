@@ -196,6 +196,8 @@
         let weaponGroup, weaponModel;
         let currentHero, heroPreviewModel;
         let skillCooldownActive = false;
+        let skillCooldownTimer = null;
+        let reloadTimer = null;
 
         const heroes = {
             neon: { name: 'NEON', hp: 200, color: 0x00ffff, speed: 1.1, ammo: 30, reloadTime: 1.5, skillCooldown: 5 },
@@ -207,6 +209,10 @@
         let currentAmmo = currentHero.ammo;
         let yVelocity = 0, canJump = true;
         const gravity = 32.0;
+        const mouseSensitivity = 0.01;
+        let moveSpeedMultiplier = 1;
+        let damageReduction = 0;
+        let skillEffectTimer = null;
 
         function init() {
             scene = new THREE.Scene();
@@ -214,6 +220,7 @@
             scene.fog = new THREE.Fog(0x020508, 15, 100);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            scene.add(camera);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -286,6 +293,7 @@
             weaponModel.add(body, barrel, handle, glow);
             weaponModel.position.set(0.4, -0.4, -0.6);
             weaponGroup.add(weaponModel);
+            weaponGroup.visible = isGameActive;
         }
 
         function createHeroPreview() {
@@ -311,8 +319,9 @@
                 direction.x = Number(moveRight) - Number(moveLeft);
                 direction.normalize();
 
-                if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta * currentHero.speed;
-                if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta * currentHero.speed;
+                const moveSpeed = currentHero.speed * moveSpeedMultiplier;
+                if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta * moveSpeed;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta * moveSpeed;
 
                 camera.translateX(-velocity.x * delta);
                 camera.translateZ(velocity.z * delta);
@@ -356,17 +365,23 @@
             });
 
             document.addEventListener('keydown', (e) => {
+                if (e.code === 'Escape' && isGameActive) {
+                    document.exitPointerLock();
+                    pauseGame();
+                    return;
+                }
+                if (!isGameActive) return;
                 if (e.code === 'KeyW') moveForward = true;
                 if (e.code === 'KeyS') moveBackward = true;
                 if (e.code === 'KeyA') moveLeft = true;
                 if (e.code === 'KeyD') moveRight = true;
                 if (e.code === 'KeyR') reload();
                 if (e.code === 'KeyQ') useUltimate();
-                if (e.code === 'Space' && canJump && isGameActive) {
+                if (e.code === 'Space' && canJump) {
                     yVelocity += 12;
                     canJump = false;
                 }
-                if (e.code === 'ShiftLeft' && isGameActive) useSkill();
+                if (e.code === 'ShiftLeft') useSkill();
             });
 
             document.addEventListener('keyup', (e) => {
@@ -378,8 +393,8 @@
 
             document.addEventListener('mousemove', (e) => {
                 if (isGameActive && document.pointerLockElement) {
-                    camera.rotation.y -= e.movementX * 0.002;
-                    camera.rotation.x -= e.movementY * 0.002;
+                    camera.rotation.y -= e.movementX * mouseSensitivity;
+                    camera.rotation.x -= e.movementY * mouseSensitivity;
                     camera.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, camera.rotation.x));
                     camera.rotation.order = 'YXZ';
                 }
@@ -398,10 +413,13 @@
         }
 
         function handleStartGame() {
+            prepareNewRun();
             isGameActive = true;
             document.getElementById('main-menu').classList.add('hidden-screen');
+            document.getElementById('game-over').classList.add('hidden-screen');
             document.getElementById('hud').classList.add('hud-visible');
             document.getElementById('crosshair').style.display = 'block';
+            if (weaponGroup) weaponGroup.visible = true;
             if (heroPreviewModel) scene.remove(heroPreviewModel);
             camera.position.set(0, 2.0, 10);
             camera.rotation.set(0, 0, 0);
@@ -410,6 +428,7 @@
         }
 
         function pauseGame() {
+            clearMovement();
             isGameActive = false;
             document.getElementById('pause-menu').classList.remove('hidden-screen');
         }
@@ -422,6 +441,8 @@
 
         function returnToMain() {
             isGameActive = false;
+            clearMovement();
+            clearTimers();
             enemies.forEach(e => { scene.remove(e); scene.remove(e.hpContainer); });
             enemies = [];
             document.getElementById('game-over').classList.add('hidden-screen');
@@ -429,6 +450,7 @@
             document.getElementById('hud').classList.remove('hud-visible');
             document.getElementById('main-menu').classList.remove('hidden-screen');
             document.getElementById('crosshair').style.display = 'none';
+            if (weaponGroup) weaponGroup.visible = false;
             createHeroPreview();
         }
 
@@ -460,12 +482,13 @@
             isReloading = true;
             document.getElementById('reload-msg').style.opacity = '1';
             weaponModel.rotation.x = -0.5;
-            setTimeout(() => {
+            reloadTimer = setTimeout(() => {
                 currentAmmo = currentHero.ammo;
                 isReloading = false;
                 weaponModel.rotation.x = 0;
                 document.getElementById('reload-msg').style.opacity = '0';
                 updateHUD();
+                reloadTimer = null;
             }, currentHero.reloadTime * 1000);
         }
 
@@ -493,16 +516,215 @@
             document.getElementById('hp-bar').style.width = `${(playerHP / currentHero.hp) * 100}%`;
             document.getElementById('hp-val').innerText = `${Math.ceil(playerHP)} / ${currentHero.hp}`;
             document.getElementById('ammo-val').innerText = currentAmmo;
+            document.getElementById('ammo-max').innerText = `/ ${currentHero.ammo}`;
             document.getElementById('ult-fill').style.height = `${ultCharge}%`;
+            document.getElementById('ult-text').innerText = Math.floor(ultCharge);
             if (ultCharge >= 100) document.getElementById('ult-circle').classList.add('ult-ready');
             else document.getElementById('ult-circle').classList.remove('ult-ready');
         }
 
         function takeDamage(amt) {
-            playerHP -= amt;
+            playerHP -= amt * (1 - damageReduction);
+            playerHP = Math.max(0, playerHP);
             updateHUD();
-            document.getElementById('damage-overlay').style.boxShadow = `inset 0 0 ${100 - playerHP}px rgba(255,0,0,0.5)`;
-            if (playerHP <= 0) { isGameActive = false; document.exitPointerLock(); document.getElementById('game-over').classList.remove('hidden-screen'); }
+            const damageGlow = Math.max(0, 100 * (1 - playerHP / currentHero.hp));
+            document.getElementById('damage-overlay').style.boxShadow = `inset 0 0 ${damageGlow}px rgba(255,0,0,0.5)`;
+            if (playerHP <= 0) {
+                isGameActive = false;
+                clearMovement();
+                document.exitPointerLock();
+                document.getElementById('game-over').classList.remove('hidden-screen');
+            }
+        }
+
+        function useSkill() {
+            if (skillCooldownActive) return;
+            skillCooldownActive = true;
+
+            if (currentHero.name === 'NEON') {
+                useNeonSkill();
+            } else if (currentHero.name === 'TITAN') {
+                useTitanSkill();
+            } else if (currentHero.name === 'WIND') {
+                useWindSkill();
+            }
+
+            startSkillCooldown();
+        }
+
+        function useNeonSkill() {
+            const start = camera.position.clone();
+            const forward = new THREE.Vector3();
+            camera.getWorldDirection(forward);
+            forward.y = 0;
+            forward.normalize();
+
+            const dashDistance = 14;
+            const end = start.clone().add(forward.multiplyScalar(dashDistance));
+            end.y = 2.0;
+            camera.position.copy(end);
+            velocity.set(0, 0, 0);
+
+            damageEnemiesAlongLine(start, end, 70, 3);
+        }
+
+        function useTitanSkill() {
+            clearSkillEffectTimer();
+            playerHP = Math.min(currentHero.hp, playerHP + 75);
+            damageReduction = 0.65;
+            damageNearbyEnemies(5, 35, true);
+            updateHUD();
+
+            skillEffectTimer = setTimeout(() => {
+                damageReduction = 0;
+                skillEffectTimer = null;
+            }, 4500);
+        }
+
+        function useWindSkill() {
+            clearSkillEffectTimer();
+            yVelocity = 22;
+            canJump = false;
+            moveSpeedMultiplier = 1.8;
+            damageNearbyEnemies(6, 20, true);
+
+            skillEffectTimer = setTimeout(() => {
+                moveSpeedMultiplier = 1;
+                skillEffectTimer = null;
+            }, 3500);
+        }
+
+        function damageEnemiesAlongLine(start, end, damage, radius) {
+            let hitAny = false;
+            enemies.slice().forEach(enemy => {
+                if (distanceToLineSegment(enemy.position, start, end) <= radius) {
+                    damageEnemy(enemy, damage);
+                    hitAny = true;
+                }
+            });
+            if (hitAny) showHitMarker();
+        }
+
+        function damageNearbyEnemies(radius, damage, knockback) {
+            let hitAny = false;
+            enemies.slice().forEach(enemy => {
+                const distance = enemy.position.distanceTo(camera.position);
+                if (distance <= radius) {
+                    if (knockback) {
+                        const push = new THREE.Vector3().subVectors(enemy.position, camera.position).normalize();
+                        enemy.position.add(push.multiplyScalar(3));
+                    }
+                    damageEnemy(enemy, damage);
+                    hitAny = true;
+                }
+            });
+            if (hitAny) showHitMarker();
+        }
+
+        function damageEnemy(enemy, damage) {
+            enemy.hp -= damage;
+            updateEnemyHealth(enemy);
+            ultCharge = Math.min(100, ultCharge + 4);
+
+            if (enemy.hp <= 0) {
+                scene.remove(enemy);
+                scene.remove(enemy.hpContainer);
+                enemies = enemies.filter(e => e !== enemy);
+                ultCharge = Math.min(100, ultCharge + 10);
+            }
+
+            updateHUD();
+        }
+
+        function distanceToLineSegment(point, start, end) {
+            const segment = new THREE.Vector3().subVectors(end, start);
+            const segmentLengthSq = segment.lengthSq();
+            if (segmentLengthSq === 0) return point.distanceTo(start);
+
+            const pointOffset = new THREE.Vector3().subVectors(point, start);
+            const t = Math.max(0, Math.min(1, pointOffset.dot(segment) / segmentLengthSq));
+            const closest = start.clone().add(segment.multiplyScalar(t));
+            return point.distanceTo(closest);
+        }
+
+        function startSkillCooldown() {
+            const overlay = document.getElementById('skill-cooldown-overlay');
+            const cooldownMs = currentHero.skillCooldown * 1000;
+            const startedAt = Date.now();
+            overlay.style.height = '100%';
+
+            const tick = () => {
+                const elapsed = Date.now() - startedAt;
+                const remaining = Math.max(0, 1 - elapsed / cooldownMs);
+                overlay.style.height = `${remaining * 100}%`;
+
+                if (remaining > 0) {
+                    skillCooldownTimer = requestAnimationFrame(tick);
+                } else {
+                    skillCooldownActive = false;
+                    skillCooldownTimer = null;
+                }
+            };
+
+            skillCooldownTimer = requestAnimationFrame(tick);
+        }
+
+        function useUltimate() {
+            if (ultCharge < 100) return;
+            enemies.forEach(e => { scene.remove(e); scene.remove(e.hpContainer); });
+            enemies = [];
+            ultCharge = 0;
+            updateHUD();
+        }
+
+        function prepareNewRun() {
+            clearMovement();
+            clearTimers();
+            playerHP = currentHero.hp;
+            currentAmmo = currentHero.ammo;
+            ultCharge = 0;
+            isReloading = false;
+            skillCooldownActive = false;
+            moveSpeedMultiplier = 1;
+            damageReduction = 0;
+            yVelocity = 0;
+            canJump = true;
+            enemies.forEach(e => { scene.remove(e); scene.remove(e.hpContainer); });
+            enemies = [];
+            document.getElementById('damage-overlay').style.boxShadow = 'inset 0 0 0px rgba(255,0,0,0)';
+            document.getElementById('reload-msg').style.opacity = '0';
+            document.getElementById('skill-cooldown-overlay').style.height = '0%';
+            if (weaponModel) weaponModel.rotation.x = 0;
+            updateHUD();
+        }
+
+        function clearMovement() {
+            moveForward = false;
+            moveBackward = false;
+            moveLeft = false;
+            moveRight = false;
+            velocity.set(0, 0, 0);
+        }
+
+        function clearTimers() {
+            if (reloadTimer) {
+                clearTimeout(reloadTimer);
+                reloadTimer = null;
+            }
+            if (skillCooldownTimer) {
+                cancelAnimationFrame(skillCooldownTimer);
+                skillCooldownTimer = null;
+            }
+            clearSkillEffectTimer();
+            moveSpeedMultiplier = 1;
+            damageReduction = 0;
+        }
+
+        function clearSkillEffectTimer() {
+            if (skillEffectTimer) {
+                clearTimeout(skillEffectTimer);
+                skillEffectTimer = null;
+            }
         }
 
         function showHeroMenu() { document.getElementById('main-menu').classList.add('hidden-screen'); document.getElementById('hero-menu').classList.remove('hidden-screen'); }
@@ -510,7 +732,7 @@
         function backToMain() { document.getElementById('hero-menu').classList.add('hidden-screen'); document.getElementById('settings-menu').classList.add('hidden-screen'); document.getElementById('main-menu').classList.remove('hidden-screen'); }
         function selectHero(id) { currentHero = heroes[id]; playerHP = currentHero.hp; currentAmmo = currentHero.ammo; setupWeapon(); createHeroPreview(); document.getElementById('hero-tag').innerText = currentHero.name; backToMain(); }
         function showHitMarker() { document.getElementById('hit-marker').style.opacity = '1'; setTimeout(() => document.getElementById('hit-marker').style.opacity = '0', 100); }
-        function resetGame() { playerHP = currentHero.hp; currentAmmo = currentHero.ammo; ultCharge = 0; enemies.forEach(e => { scene.remove(e); scene.remove(e.hpContainer); }); enemies = []; document.getElementById('game-over').classList.add('hidden-screen'); handleStartGame(); }
+        function resetGame() { document.getElementById('game-over').classList.add('hidden-screen'); handleStartGame(); }
 
         window.onload = init;
     </script>
