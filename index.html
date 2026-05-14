@@ -3,133 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Hero FPS - Arena Edition</title>
+    <title>Cyber Hero FPS - Hero Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;700&display=swap');
         
-        body { margin: 0; overflow: hidden; font-family: 'Inter', sans-serif; background: #000; color: white; user-select: none; }
+        body { margin: 0; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; background: #000; color: white; user-select: none; }
         canvas { display: block; width: 100vw; height: 100vh; }
 
-        #ui-container { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            pointer-events: none; z-index: 100; 
-        }
-        
-        .screen {
-            position: absolute; width: 100%; height: 100%;
-            display: flex; flex-direction: column; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            pointer-events: auto;
-        }
+        #ui-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+        .screen { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: auto; }
         .hidden-screen { opacity: 0; pointer-events: none !important; transform: scale(1.05); }
 
+        /* Damage Vignette */
+        #damage-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 50;
+            box-shadow: inset 0 0 0px rgba(255, 0, 0, 0);
+            transition: box-shadow 0.2s;
+        }
+
+        /* Menu Styles */
         #main-menu { background: radial-gradient(circle at 20% 50%, rgba(0,20,30,0.9) 0%, transparent 100%); justify-content: center; padding-left: 8%; }
-        #hero-menu { background: rgba(0, 5, 10, 0.95); justify-content: center; align-items: center; backdrop-filter: blur(30px); }
+        #hero-menu, #settings-menu, #pause-menu { background: rgba(0, 5, 10, 0.95); justify-content: center; align-items: center; backdrop-filter: blur(30px); }
 
         #game-logo {
-            font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(3rem, 10vw, 5.5rem);
+            font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: clamp(3rem, 8vw, 5.5rem);
             line-height: 0.9; margin-bottom: 2.5rem; text-transform: uppercase;
             background: linear-gradient(to bottom, #fff, #0ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             filter: drop-shadow(0 0 20px rgba(0, 255, 255, 0.5)); letter-spacing: -3px;
         }
 
         .menu-btn {
-            font-family: 'Orbitron', sans-serif; font-size: 1.4rem; color: #666;
+            font-family: 'Orbitron', sans-serif; font-size: 1.4rem; color: #aaa;
             margin: 12px 0; cursor: pointer; transition: all 0.3s;
             position: relative; padding-left: 0; text-transform: uppercase; letter-spacing: 2px;
             width: fit-content; pointer-events: auto;
         }
         .menu-btn:hover { color: #fff; padding-left: 30px; text-shadow: 0 0 15px #0ff; }
-        .menu-btn::before { content: '▶'; position: absolute; left: 0; opacity: 0; transition: 0.3s; font-size: 1rem; top: 50%; transform: translateY(-50%); }
-        .menu-btn:hover::before { opacity: 1; }
 
-        /* Crosshair & Feedback */
-        #crosshair {
-            position: absolute; top: 50%; left: 50%;
-            width: 24px; height: 24px;
-            transform: translate(-50%, -50%);
-            pointer-events: none; display: none;
-        }
-        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.8); }
+        /* HUD Components */
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 24px; height: 24px; transform: translate(-50%, -50%); pointer-events: none; display: none; }
+        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(0,255,255,0.8); }
         #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
         #crosshair::after { top: 50%; left: 0; width: 100%; height: 2px; transform: translateY(-50%); }
 
-        #hit-marker {
-            position: absolute; top: 50%; left: 50%;
-            width: 50px; height: 50px;
-            transform: translate(-50%, -50%) rotate(45deg);
-            pointer-events: none; opacity: 0;
-        }
-        .hit-line { position: absolute; background: #ff4444; box-shadow: 0 0 10px #f00; }
-        .h-l-1 { top: 0; left: 50%; width: 3px; height: 100%; transform: translateX(-50%); }
-        .h-l-2 { left: 0; top: 50%; width: 100%; height: 3px; transform: translateY(-50%); }
+        #hit-marker { position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; transform: translate(-50%, -50%) rotate(45deg); pointer-events: none; opacity: 0; transition: opacity 0.1s; }
+        .hit-line { position: absolute; background: #ff4444; box-shadow: 0 0 8px #f00; }
+        .h-l-1 { top: 0; left: 50%; width: 2px; height: 100%; transform: translateX(-50%); }
+        .h-l-2 { left: 0; top: 50%; width: 100%; height: 2px; transform: translateY(-50%); }
 
-        /* HUD */
-        #hud { 
-            position: absolute; bottom: 0; width: 100%; height: 180px; 
-            display: none; justify-content: space-between; align-items: flex-end; 
-            padding: 0 6vw 40px 6vw; pointer-events: none;
-        }
+        #hud { position: absolute; bottom: 0; width: 100%; height: 200px; display: none; justify-content: space-between; align-items: flex-end; padding: 0 40px 40px 40px; pointer-events: none; }
         .hud-visible { display: flex !important; }
 
-        .health-container { width: 320px; background: rgba(0, 0, 0, 0.7); border-left: 8px solid #fff; padding: 15px; transform: skewX(-15deg); box-shadow: 10px 10px 20px rgba(0,0,0,0.5); }
-        #health-bar { height: 22px; background: #fff; width: 100%; transition: width 0.3s; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
+        .health-section { width: 320px; background: rgba(0,0,0,0.7); border-left: 8px solid #fff; padding: 15px; transform: skewX(-15deg); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+        #hp-bar-container { height: 20px; background: rgba(255,255,255,0.1); width: 100%; position: relative; overflow: hidden; }
+        #hp-bar { height: 100%; background: #fff; width: 100%; transition: width 0.3s; }
+        
+        .skill-box { width: 60px; height: 60px; background: rgba(0,0,0,0.6); border: 2px solid rgba(0,255,255,0.3); border-radius: 8px; margin-right: 15px; position: relative; display: flex; align-items: center; justify-content: center; }
+        #skill-cooldown-overlay { position: absolute; bottom: 0; width: 100%; background: rgba(0,255,255,0.4); height: 0%; transition: height 0.1s linear; }
+        #skill-key { position: absolute; top: -10px; left: -10px; background: #0ff; color: #000; font-weight: 900; padding: 2px 6px; font-size: 10px; border-radius: 4px; }
 
-        /* Game Over */
-        #game-over { 
-            position: fixed; inset: 0; background: rgba(0, 0, 0, 0.95); 
-            z-index: 2000; display: none; flex-direction: column; 
-            align-items: center; justify-content: center; pointer-events: auto;
-            backdrop-filter: blur(10px);
-        }
-        #game-over.active { display: flex; }
+        .weapon-section { display: flex; align-items: center; background: rgba(0,0,0,0.7); padding: 15px 30px; transform: skewX(-15deg); border-right: 8px solid #0ff; backdrop-filter: blur(10px); border: 1px solid rgba(0,255,255,0.1); }
+        #ammo-val { font-family: 'Orbitron', sans-serif; font-size: 3rem; font-weight: 900; line-height: 1; margin-left: 10px; }
+        
+        .ult-container { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); text-align: center; }
+        #ult-circle { width: 90px; height: 90px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: rgba(0,0,0,0.8); }
+        #ult-fill { position: absolute; bottom: 0; width: 100%; background: linear-gradient(to top, #0ff, #0088ff); height: 0%; transition: height 0.3s; }
+        #ult-text { position: relative; z-index: 2; font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 1.8rem; }
+        .ult-ready { box-shadow: 0 0 40px #0ff; border-color: #0ff !important; animation: pulse 1.5s infinite; }
 
-        #theme-toggle {
-            position: absolute; top: 30px; right: 30px; width: 50px; height: 50px;
-            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; display: flex;
-            align-items: center; justify-content: center; cursor: pointer;
-            pointer-events: auto; z-index: 200; transition: 0.3s;
-        }
-        #theme-toggle:hover { background: rgba(255,255,255,0.15); transform: rotate(15deg); }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body>
 
-    <div id="theme-toggle" onclick="toggleTheme(event)">
-        <svg id="theme-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-    </div>
+    <div id="damage-overlay"></div>
 
     <div id="ui-container">
         <div id="main-menu" class="screen">
-            <div id="game-logo">CYBER<br>ARENA</div>
-            <div class="menu-btn" onclick="handleStartGame()">Play Mission</div>
-            <div class="menu-btn" onclick="showHeroMenu()">Heroes</div>
-            <div class="menu-btn" onclick="alert('Sensitivity: 1.0\nFOV: 75')">Settings</div>
+            <div id="game-logo">CYBER<br>HEROES</div>
+            <div class="menu-btn" onclick="handleStartGame()">게임 시작</div>
+            <div class="menu-btn" onclick="showHeroMenu()">영웅 선택</div>
+            <div class="menu-btn" onclick="showSettings()">조작법 & 설정</div>
+        </div>
+
+        <div id="pause-menu" class="screen hidden-screen">
+            <div class="bg-black/60 p-10 rounded-3xl border border-cyan-500/30 backdrop-blur-xl w-[500px]">
+                <h2 class="font-['Orbitron'] text-4xl mb-6 text-cyan-400 font-black">PAUSED</h2>
+                <div class="mb-8 text-sm text-gray-300 space-y-2">
+                    <p class="text-cyan-300 font-bold mb-2">현재 조작 가이드</p>
+                    <div class="flex justify-between"><span>이동</span> <span class="text-white">W, A, S, D</span></div>
+                    <div class="flex justify-between"><span>점프</span> <span class="text-white">SPACE</span></div>
+                    <div class="flex justify-between"><span>발사 / 재장전</span> <span class="text-white">L-CLICK / R</span></div>
+                    <div class="flex justify-between"><span>영웅 스킬</span> <span class="text-white">L-SHIFT</span></div>
+                    <div class="flex justify-between"><span>궁극기</span> <span class="text-white">Q</span></div>
+                </div>
+                <div class="flex flex-col gap-4">
+                    <div class="menu-btn !text-lg !m-0" onclick="resumeGame()">계속하기</div>
+                    <div class="menu-btn !text-lg !m-0 !text-red-400" onclick="returnToMain()">메인 메뉴로</div>
+                </div>
+            </div>
         </div>
 
         <div id="hero-menu" class="screen hidden-screen">
-            <h2 class="font-['Orbitron'] text-4xl mb-12 tracking-[0.3em] text-cyan-400">SELECT OPERATIVE</h2>
-            <div class="flex gap-8">
-                <div class="group p-8 bg-white/5 border-2 border-white/10 rounded-2xl cursor-pointer hover:border-cyan-400 transition-all hover:-translate-y-2" onclick="selectHero('neon')">
-                    <div class="w-24 h-24 bg-cyan-400 rounded-full mx-auto mb-6 shadow-[0_0_30px_rgba(0,255,255,0.6)]"></div>
-                    <div class="text-center font-bold text-xl tracking-widest group-hover:text-cyan-400">NEON</div>
-                    <div class="text-[10px] text-gray-500 text-center mt-2">BALANCED / DASH</div>
+            <h2 class="font-['Orbitron'] text-4xl mb-12 tracking-[0.2em] text-cyan-400">SELECT HERO</h2>
+            <div class="flex flex-wrap justify-center gap-6">
+                <div class="group p-6 bg-white/5 border-2 border-white/10 rounded-xl cursor-pointer hover:border-cyan-400 transition-all w-64" onclick="selectHero('neon')">
+                    <div class="w-20 h-20 bg-cyan-400 rounded-full mx-auto mb-4"></div>
+                    <div class="text-center font-bold text-xl mb-2">NEON</div>
+                    <div class="text-[11px] text-cyan-300 font-bold text-center">[SHIFT] 차원 대시</div>
                 </div>
-                <div class="group p-8 bg-white/5 border-2 border-white/10 rounded-2xl cursor-pointer hover:border-orange-500 transition-all hover:-translate-y-2" onclick="selectHero('titan')">
-                    <div class="w-24 h-24 bg-orange-500 rounded-full mx-auto mb-6 shadow-[0_0_30px_rgba(255,165,0,0.6)]"></div>
-                    <div class="text-center font-bold text-xl tracking-widest group-hover:text-orange-500">TITAN</div>
-                    <div class="text-[10px] text-gray-500 text-center mt-2">TANK / FORTIFIED</div>
+                <div class="group p-6 bg-white/5 border-2 border-white/10 rounded-xl cursor-pointer hover:border-orange-500 transition-all w-64" onclick="selectHero('titan')">
+                    <div class="w-20 h-20 bg-orange-500 rounded-full mx-auto mb-4"></div>
+                    <div class="text-center font-bold text-xl mb-2">TITAN</div>
+                    <div class="text-[11px] text-orange-300 font-bold text-center">[SHIFT] 강화 장갑</div>
                 </div>
-                <div class="group p-8 bg-white/5 border-2 border-white/10 rounded-2xl cursor-pointer hover:border-lime-400 transition-all hover:-translate-y-2" onclick="selectHero('wind')">
-                    <div class="w-24 h-24 bg-lime-400 rounded-full mx-auto mb-6 shadow-[0_0_30px_rgba(204,255,0,0.6)]"></div>
-                    <div class="text-center font-bold text-xl tracking-widest group-hover:text-lime-400">WIND</div>
-                    <div class="text-[10px] text-gray-500 text-center mt-2">SPEED / AGILITY</div>
+                <div class="group p-6 bg-white/5 border-2 border-white/10 rounded-xl cursor-pointer hover:border-lime-400 transition-all w-64" onclick="selectHero('wind')">
+                    <div class="w-20 h-20 bg-lime-400 rounded-full mx-auto mb-4"></div>
+                    <div class="text-center font-bold text-xl mb-2">WIND</div>
+                    <div class="text-[11px] text-lime-300 font-bold text-center">[SHIFT] 윈드 점프</div>
                 </div>
             </div>
-            <div class="menu-btn mt-16 opacity-50" onclick="backToMain()">↩ Return to Base</div>
+            <div class="menu-btn mt-12 opacity-70" onclick="backToMain()">↩ 돌아가기</div>
+        </div>
+
+        <div id="settings-menu" class="screen hidden-screen">
+            <h2 class="font-['Orbitron'] text-4xl mb-8 tracking-widest">SETTINGS</h2>
+            <div class="max-w-xl bg-white/5 p-10 rounded-3xl border border-white/10 backdrop-blur-xl text-gray-300">
+                <p class="mb-4 text-cyan-400 font-bold">조작 방법</p>
+                <p>W,A,S,D: 이동 | SPACE: 점프</p>
+                <p>L-CLICK: 발사 | R: 재장전</p>
+                <p>L-SHIFT: 고유 스킬 | Q: 궁극기</p>
+                <p class="mt-6 text-red-400">ESC: 게임 일시정지 및 메뉴</p>
+            </div>
+            <div class="menu-btn mt-10" onclick="backToMain()">↩ 닫기</div>
         </div>
 
         <div id="crosshair"></div>
@@ -139,141 +148,253 @@
         </div>
 
         <div id="hud">
-            <div class="health-container">
-                <div id="hero-tag" class="text-[11px] font-black text-cyan-400 uppercase mb-2 tracking-tighter">AGENT: NEON</div>
-                <div id="health-bar"></div>
+            <div class="health-section">
+                <div id="hero-tag" class="text-[12px] font-black uppercase mb-1 tracking-wider">NEON</div>
+                <div id="hp-bar-container"><div id="hp-bar"></div></div>
+                <div id="hp-val" class="font-['Orbitron'] text-xl font-bold mt-2">200 / 200</div>
             </div>
-            <div class="transform skewX(-15deg) bg-white/5 px-8 py-4 border border-white/10 backdrop-blur-md">
-                <div class="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mb-1">Ability</div>
-                <div class="text-lg font-black italic">PHASE DASH [L-SHIFT]</div>
+
+            <div class="ult-container">
+                <div id="ult-circle">
+                    <div id="ult-fill"></div>
+                    <div id="ult-text">0</div>
+                </div>
+            </div>
+
+            <div class="flex items-end">
+                <div class="skill-box">
+                    <div id="skill-key">SHIFT</div>
+                    <div id="skill-cooldown-overlay"></div>
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0ff" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <div class="weapon-section">
+                    <div class="text-right">
+                        <div id="reload-msg" class="text-[10px] text-red-500 font-bold opacity-0">RELOADING</div>
+                        <div id="ammo-ui"><span id="ammo-val">30</span><span id="ammo-max" class="text-gray-500 text-lg">/ 30</span></div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div id="game-over">
-            <h2 class="font-['Orbitron'] text-7xl text-red-600 mb-4 font-black tracking-tighter">TERMINATED</h2>
-            <p class="text-gray-400 mb-12 tracking-[0.5em] uppercase text-sm">System Malfunction - Operative Lost</p>
-            <div class="flex gap-10">
-                <button class="menu-btn" onclick="resetGame()">Deploy Again</button>
-                <button class="menu-btn" onclick="returnToMain()">Exit Arena</button>
+        <div id="game-over" class="screen hidden-screen flex flex-col items-center justify-center bg-black/95">
+            <h2 class="font-['Orbitron'] text-7xl text-red-600 mb-2 font-black italic">ELIMINATED</h2>
+            <div class="flex gap-10 mt-12">
+                <div class="menu-btn" onclick="resetGame()">다시 도전</div>
+                <div class="menu-btn" onclick="returnToMain()">메인 터미널</div>
             </div>
         </div>
     </div>
 
     <script>
         let scene, camera, renderer, clock, raycaster;
-        let isGameActive = false, isDarkMode = true;
+        let isGameActive = false;
         let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-        let velocity, direction;
-        let enemies = [], obstacles = [], health = 200, maxHealth = 200;
-        let heroPreviewModel, ambientLight, sunLight, floor;
+        let velocity = new THREE.Vector3(), direction = new THREE.Vector3();
+        let enemies = [], obstacles = [];
+        let playerHP = 200, ultCharge = 0, isReloading = false;
+        
+        let weaponGroup, weaponModel;
+        let currentHero, heroPreviewModel;
+        let skillCooldownActive = false;
 
         const heroes = {
-            neon: { name: 'NEON', hp: 200, color: 0x00ffff, speed: 1.1, dash: 40 },
-            titan: { name: 'TITAN', hp: 450, color: 0xffa500, speed: 0.75, dash: 20 },
-            wind: { name: 'WIND', hp: 130, color: 0xccff00, speed: 1.6, dash: 65 }
+            neon: { name: 'NEON', hp: 200, color: 0x00ffff, speed: 1.1, ammo: 30, reloadTime: 1.5, skillCooldown: 5 },
+            titan: { name: 'TITAN', hp: 450, color: 0xffa500, speed: 0.75, ammo: 10, reloadTime: 2.5, skillCooldown: 10 },
+            wind: { name: 'WIND', hp: 130, color: 0xccff00, speed: 1.5, ammo: 6, reloadTime: 1.2, skillCooldown: 4 }
         };
-        let currentHero = heroes.neon;
+
+        currentHero = heroes.neon;
+        let currentAmmo = currentHero.ammo;
+        let yVelocity = 0, canJump = true;
+        const gravity = 32.0;
 
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x020508);
-            scene.fog = new THREE.Fog(0x020508, 10, 80);
+            scene.fog = new THREE.Fog(0x020508, 15, 100);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
             clock = new THREE.Clock();
             raycaster = new THREE.Raycaster();
-            velocity = new THREE.Vector3();
-            direction = new THREE.Vector3();
 
-            ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-            scene.add(ambientLight);
-            sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-            sunLight.position.set(20, 40, 20);
-            sunLight.castShadow = true;
-            scene.add(sunLight);
-
-            // Floor
-            const floorGeo = new THREE.PlaneGeometry(2000, 2000);
-            const floorMat = new THREE.MeshPhongMaterial({ color: 0x0a0a0a, specular: 0x111111 });
-            floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
-
-            const grid = new THREE.GridHelper(500, 80, 0x00ffff, 0x051015);
-            grid.position.y = 0.05;
-            scene.add(grid);
-
+            setupLighting();
             createMap();
             createHeroPreview();
+            setupWeapon();
             setupEvents();
             animate();
         }
 
+        function setupLighting() {
+            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambient);
+            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+            sun.position.set(20, 60, 20);
+            sun.castShadow = true;
+            scene.add(sun);
+        }
+
         function createMap() {
-            const wallMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
-            const neonMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+            const floorMat = new THREE.MeshPhongMaterial({ color: 0x050505 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
 
-            const layouts = [
-                { x: 15, z: 15, w: 4, h: 8, d: 4 },
-                { x: -20, z: 10, w: 6, h: 4, d: 6 },
-                { x: 0, z: -25, w: 10, h: 5, d: 2 },
-                { x: -15, z: -15, w: 3, h: 10, d: 3 },
-                { x: 25, z: -5, w: 2, h: 15, d: 2 },
-                { x: -30, z: -30, w: 8, h: 6, d: 8 },
-                { x: 35, z: 25, w: 5, h: 7, d: 5 }
-            ];
+            const grid = new THREE.GridHelper(1000, 100, 0x00ffff, 0x081015);
+            grid.position.y = 0.05;
+            scene.add(grid);
 
+            // Obstacles
+            const layouts = [{x: 20, z: 20, w: 10, h: 15, d: 10}, {x: -25, z: 30, w: 15, h: 8, d: 15}];
             layouts.forEach(l => {
-                const group = new THREE.Group();
-                const boxGeo = new THREE.BoxGeometry(l.w, l.h, l.d);
-                const wall = new THREE.Mesh(boxGeo, wallMat);
-                wall.position.y = l.h / 2;
+                const wall = new THREE.Mesh(new THREE.BoxGeometry(l.w, l.h, l.d), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+                wall.position.set(l.x, l.h/2, l.z);
                 wall.castShadow = true;
                 wall.receiveShadow = true;
-                group.add(wall);
-
-                // Neon Trim
-                const trimGeo = new THREE.BoxGeometry(l.w + 0.1, 0.2, l.d + 0.1);
-                const trim = new THREE.Mesh(trimGeo, neonMat);
-                trim.position.y = l.h;
-                group.add(trim);
-
-                group.position.set(l.x, 0, l.z);
-                scene.add(group);
+                scene.add(wall);
                 obstacles.push(wall);
             });
         }
 
+        function setupWeapon() {
+            if(weaponGroup) camera.remove(weaponGroup);
+            weaponGroup = new THREE.Group();
+            camera.add(weaponGroup);
+
+            // Detailed Weapon Model
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.8), new THREE.MeshPhongMaterial({ color: 0x1a1a1a }));
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.4), new THREE.MeshPhongMaterial({ color: 0x333333 }));
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.z = -0.5;
+            
+            const handle = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.15), new THREE.MeshPhongMaterial({ color: 0x111111 }));
+            handle.position.set(0, -0.2, 0.2);
+            handle.rotation.x = -0.2;
+
+            const glow = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.1, 0.3), new THREE.MeshPhongMaterial({ color: currentHero.color, emissive: currentHero.color, emissiveIntensity: 1 }));
+            glow.position.set(0, 0.05, -0.1);
+
+            weaponModel = new THREE.Group();
+            weaponModel.add(body, barrel, handle, glow);
+            weaponModel.position.set(0.4, -0.4, -0.6);
+            weaponGroup.add(weaponModel);
+        }
+
         function createHeroPreview() {
             if (heroPreviewModel) scene.remove(heroPreviewModel);
-            const geo = new THREE.CapsuleGeometry(0.8, 1.6, 4, 16);
-            const mat = new THREE.MeshPhongMaterial({ 
-                color: currentHero.color, 
-                emissive: currentHero.color, 
-                emissiveIntensity: 0.5 
-            });
+            const geo = new THREE.CapsuleGeometry(0.5, 1, 4, 8);
+            const mat = new THREE.MeshPhongMaterial({ color: currentHero.color, emissive: currentHero.color, emissiveIntensity: 0.5 });
             heroPreviewModel = new THREE.Mesh(geo, mat);
-            heroPreviewModel.position.set(0, 1.6, 0);
+            heroPreviewModel.position.set(0, 1.5, 0);
             scene.add(heroPreviewModel);
         }
 
-        function selectHero(id) {
-            currentHero = heroes[id];
-            maxHealth = currentHero.hp;
-            health = maxHealth;
-            if (heroPreviewModel) {
-                heroPreviewModel.material.color.setHex(currentHero.color);
-                heroPreviewModel.material.emissive.setHex(currentHero.color);
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            if (isGameActive) {
+                // Movement logic
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
+                yVelocity -= gravity * delta;
+
+                direction.z = Number(moveForward) - Number(moveBackward);
+                direction.x = Number(moveRight) - Number(moveLeft);
+                direction.normalize();
+
+                if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta * currentHero.speed;
+                if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta * currentHero.speed;
+
+                camera.translateX(-velocity.x * delta);
+                camera.translateZ(velocity.z * delta);
+                camera.position.y += yVelocity * delta;
+
+                if (camera.position.y < 2.0) {
+                    yVelocity = 0;
+                    camera.position.y = 2.0;
+                    canJump = true;
+                }
+
+                // Weapon Sway
+                weaponModel.position.y = -0.4 + Math.sin(Date.now() * 0.005) * 0.01;
+                weaponModel.position.x = 0.4 + Math.cos(Date.now() * 0.003) * 0.01;
+
+                // Enemy update
+                if (Math.random() < 0.01) spawnEnemy();
+                enemies.forEach(e => {
+                    const dir = new THREE.Vector3().subVectors(camera.position, e.position).normalize();
+                    e.position.add(dir.multiplyScalar(0.05));
+                    e.hpContainer.position.copy(e.position).y += 2;
+                    e.hpContainer.lookAt(camera.position);
+                    if (e.position.distanceTo(camera.position) < 2) takeDamage(0.5);
+                });
+            } else {
+                // Menu camera rotation
+                const t = Date.now() * 0.0005;
+                camera.position.set(Math.cos(t) * 12, 5, Math.sin(t) * 12);
+                camera.lookAt(0, 1.5, 0);
+                if (heroPreviewModel) heroPreviewModel.rotation.y += 0.01;
             }
-            updateHUD();
-            backToMain();
+
+            renderer.render(scene, camera);
+        }
+
+        function setupEvents() {
+            document.addEventListener('pointerlockchange', () => {
+                if (document.pointerLockElement === null && isGameActive) {
+                    pauseGame();
+                }
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.code === 'KeyW') moveForward = true;
+                if (e.code === 'KeyS') moveBackward = true;
+                if (e.code === 'KeyA') moveLeft = true;
+                if (e.code === 'KeyD') moveRight = true;
+                if (e.code === 'KeyR') reload();
+                if (e.code === 'KeyQ') useUltimate();
+                if (e.code === 'Space' && canJump && isGameActive) {
+                    yVelocity += 12;
+                    canJump = false;
+                }
+                if (e.code === 'ShiftLeft' && isGameActive) useSkill();
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (e.code === 'KeyW') moveForward = false;
+                if (e.code === 'KeyS') moveBackward = false;
+                if (e.code === 'KeyA') moveLeft = false;
+                if (e.code === 'KeyD') moveRight = false;
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (isGameActive && document.pointerLockElement) {
+                    camera.rotation.y -= e.movementX * 0.002;
+                    camera.rotation.x -= e.movementY * 0.002;
+                    camera.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, camera.rotation.x));
+                    camera.rotation.order = 'YXZ';
+                }
+            });
+
+            document.addEventListener('mousedown', () => {
+                if (isGameActive && document.pointerLockElement) shoot();
+                else if (isGameActive) document.body.requestPointerLock();
+            });
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
         }
 
         function handleStartGame() {
@@ -282,187 +403,114 @@
             document.getElementById('hud').classList.add('hud-visible');
             document.getElementById('crosshair').style.display = 'block';
             if (heroPreviewModel) scene.remove(heroPreviewModel);
-            
             camera.position.set(0, 2.0, 10);
             camera.rotation.set(0, 0, 0);
             document.body.requestPointerLock();
             updateHUD();
         }
 
-        function setupEvents() {
-            document.addEventListener('keydown', (e) => {
-                if (e.code === 'KeyW') moveForward = true;
-                if (e.code === 'KeyS') moveBackward = true;
-                if (e.code === 'KeyA') moveLeft = true;
-                if (e.code === 'KeyD') moveRight = true;
-                if (e.code === 'ShiftLeft' && isGameActive) {
-                    const dashDir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-                    dashDir.y = 0;
-                    velocity.add(dashDir.multiplyScalar(currentHero.dash * 0.25));
-                }
-            });
-            document.addEventListener('keyup', (e) => {
-                if (e.code === 'KeyW') moveForward = false;
-                if (e.code === 'KeyS') moveBackward = false;
-                if (e.code === 'KeyA') moveLeft = false;
-                if (e.code === 'KeyD') moveRight = false;
-            });
-            document.addEventListener('mousemove', (e) => {
-                if (isGameActive && document.pointerLockElement === document.body) {
-                    camera.rotation.y -= e.movementX * 0.002;
-                    camera.rotation.x -= e.movementY * 0.002;
-                    camera.rotation.x = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, camera.rotation.x));
-                    camera.rotation.order = 'YXZ';
-                }
-            });
-            document.addEventListener('mousedown', () => {
-                if (isGameActive && document.pointerLockElement === document.body) shoot();
-                else if (isGameActive && !document.pointerLockElement) document.body.requestPointerLock();
-            });
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-        }
-
-        function shoot() {
-            raycaster.setFromCamera({x: 0, y: 0}, camera);
-            const hits = raycaster.intersectObjects(enemies);
-            if (hits.length > 0) {
-                const enemy = hits[0].object;
-                enemy.hp -= 40;
-                showHitMarker();
-                if (enemy.hp <= 0) {
-                    scene.remove(enemy);
-                    enemies = enemies.filter(e => e !== enemy);
-                }
-            }
-        }
-
-        function showHitMarker() {
-            const hm = document.getElementById('hit-marker');
-            hm.style.opacity = '1';
-            setTimeout(() => hm.style.opacity = '0', 120);
-        }
-
-        function spawnEnemy() {
-            if (enemies.length >= 8) return; // Limit total enemies
-            
-            const geo = new THREE.BoxGeometry(1.5, 2.5, 1.5);
-            const mat = new THREE.MeshPhongMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.4 });
-            const enemy = new THREE.Mesh(geo, mat);
-            
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 40 + Math.random() * 20;
-            enemy.position.set(Math.cos(angle) * dist, 1.25, Math.sin(angle) * dist);
-            enemy.hp = 100;
-            scene.add(enemy);
-            enemies.push(enemy);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = Math.min(clock.getDelta(), 0.1);
-
-            if (isGameActive) {
-                // Movement
-                direction.z = Number(moveForward) - Number(moveBackward);
-                direction.x = Number(moveRight) - Number(moveLeft);
-                direction.normalize();
-
-                if (moveForward || moveBackward) velocity.z -= direction.z * 55 * currentHero.speed * delta;
-                if (moveLeft || moveRight) velocity.x -= direction.x * 55 * currentHero.speed * delta;
-
-                camera.translateX(-velocity.x * delta);
-                camera.translateZ(velocity.z * delta);
-                camera.position.y = 2.0;
-                velocity.multiplyScalar(0.9);
-
-                // Boundary/Map Constraint
-                const mapLimit = 200;
-                camera.position.x = Math.max(-mapLimit, Math.min(mapLimit, camera.position.x));
-                camera.position.z = Math.max(-mapLimit, Math.min(mapLimit, camera.position.z));
-
-                // Enemy AI
-                enemies.forEach(enemy => {
-                    const dir = new THREE.Vector3().subVectors(camera.position, enemy.position).normalize();
-                    // Lowered speed for balance: 3.0 instead of 4.5
-                    enemy.position.add(dir.multiplyScalar(delta * 2.8)); 
-                    enemy.lookAt(camera.position);
-
-                    if (enemy.position.distanceTo(camera.position) < 2.5) {
-                        health -= 35 * delta;
-                        updateHUD();
-                        if (health <= 0) gameOver();
-                    }
-                });
-
-                // Spawning: Lowered rate
-                if (Math.random() < 0.008) spawnEnemy();
-            } else {
-                const t = Date.now() * 0.0005;
-                camera.position.set(Math.cos(t) * 12, 3, Math.sin(t) * 12);
-                camera.lookAt(0, 1.5, 0);
-                if (heroPreviewModel) heroPreviewModel.rotation.y += 0.01;
-            }
-            renderer.render(scene, camera);
-        }
-
-        function gameOver() {
+        function pauseGame() {
             isGameActive = false;
-            document.exitPointerLock();
-            document.getElementById('game-over').classList.add('active');
+            document.getElementById('pause-menu').classList.remove('hidden-screen');
         }
 
-        function resetGame() {
-            health = maxHealth;
-            enemies.forEach(e => scene.remove(e));
-            enemies = [];
-            document.getElementById('game-over').classList.remove('active');
-            handleStartGame();
+        function resumeGame() {
+            isGameActive = true;
+            document.getElementById('pause-menu').classList.add('hidden-screen');
+            document.body.requestPointerLock();
         }
 
         function returnToMain() {
             isGameActive = false;
-            health = maxHealth;
-            enemies.forEach(e => scene.remove(e));
+            enemies.forEach(e => { scene.remove(e); scene.remove(e.hpContainer); });
             enemies = [];
-            document.getElementById('game-over').classList.remove('active');
+            document.getElementById('game-over').classList.add('hidden-screen');
+            document.getElementById('pause-menu').classList.add('hidden-screen');
             document.getElementById('hud').classList.remove('hud-visible');
-            document.getElementById('crosshair').style.display = 'none';
             document.getElementById('main-menu').classList.remove('hidden-screen');
+            document.getElementById('crosshair').style.display = 'none';
             createHeroPreview();
         }
 
+        function shoot() {
+            if (isReloading || currentAmmo <= 0) { if (currentAmmo <= 0) reload(); return; }
+            currentAmmo--;
+            updateHUD();
+            weaponModel.position.z += 0.15;
+            setTimeout(() => weaponModel.position.z -= 0.15, 50);
+
+            raycaster.setFromCamera({x: 0, y: 0}, camera);
+            const hits = raycaster.intersectObjects(enemies);
+            if (hits.length > 0) {
+                const target = hits[0].object;
+                target.hp -= 40;
+                showHitMarker();
+                updateEnemyHealth(target);
+                ultCharge = Math.min(100, ultCharge + 5);
+                if (target.hp <= 0) {
+                    scene.remove(target); scene.remove(target.hpContainer);
+                    enemies = enemies.filter(e => e !== target);
+                    ultCharge = Math.min(100, ultCharge + 10);
+                }
+            }
+        }
+
+        function reload() {
+            if (isReloading || currentAmmo === currentHero.ammo) return;
+            isReloading = true;
+            document.getElementById('reload-msg').style.opacity = '1';
+            weaponModel.rotation.x = -0.5;
+            setTimeout(() => {
+                currentAmmo = currentHero.ammo;
+                isReloading = false;
+                weaponModel.rotation.x = 0;
+                document.getElementById('reload-msg').style.opacity = '0';
+                updateHUD();
+            }, currentHero.reloadTime * 1000);
+        }
+
+        function spawnEnemy() {
+            if (enemies.length >= 8) return;
+            const enemy = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), new THREE.MeshPhongMaterial({ color: 0xff4444 }));
+            const dist = 30 + Math.random() * 20;
+            const angle = Math.random() * Math.PI * 2;
+            enemy.position.set(Math.cos(angle)*dist, 1.5, Math.sin(angle)*dist);
+            enemy.hp = 100;
+
+            const hpGroup = new THREE.Group();
+            const bar = new THREE.Mesh(new THREE.PlaneGeometry(2, 0.2), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+            enemy.hpBar = bar;
+            hpGroup.add(bar);
+            enemy.hpContainer = hpGroup;
+            
+            scene.add(enemy, hpGroup);
+            enemies.push(enemy);
+        }
+
+        function updateEnemyHealth(e) { e.hpBar.scale.x = Math.max(0, e.hp / 100); }
+
         function updateHUD() {
-            const bar = document.getElementById('health-bar');
-            bar.style.width = `${Math.max(0, (health / maxHealth) * 100)}%`;
-            const tag = document.getElementById('hero-tag');
-            tag.innerText = `AGENT: ${currentHero.name}`;
-            tag.style.color = `#${currentHero.color.toString(16).padStart(6, '0')}`;
+            document.getElementById('hp-bar').style.width = `${(playerHP / currentHero.hp) * 100}%`;
+            document.getElementById('hp-val').innerText = `${Math.ceil(playerHP)} / ${currentHero.hp}`;
+            document.getElementById('ammo-val').innerText = currentAmmo;
+            document.getElementById('ult-fill').style.height = `${ultCharge}%`;
+            if (ultCharge >= 100) document.getElementById('ult-circle').classList.add('ult-ready');
+            else document.getElementById('ult-circle').classList.remove('ult-ready');
         }
 
-        function toggleTheme(e) {
-            e.stopPropagation();
-            isDarkMode = !isDarkMode;
-            const bgColor = isDarkMode ? 0x020508 : 0x8ecae6;
-            scene.background.setHex(bgColor);
-            scene.fog.color.setHex(bgColor);
-            ambientLight.intensity = isDarkMode ? 0.8 : 1.8;
-            document.getElementById('theme-icon').innerHTML = isDarkMode ? 
-                '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>' :
-                '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>';
+        function takeDamage(amt) {
+            playerHP -= amt;
+            updateHUD();
+            document.getElementById('damage-overlay').style.boxShadow = `inset 0 0 ${100 - playerHP}px rgba(255,0,0,0.5)`;
+            if (playerHP <= 0) { isGameActive = false; document.exitPointerLock(); document.getElementById('game-over').classList.remove('hidden-screen'); }
         }
 
-        function showHeroMenu() { 
-            document.getElementById('main-menu').classList.add('hidden-screen'); 
-            document.getElementById('hero-menu').classList.remove('hidden-screen'); 
-        }
-        function backToMain() { 
-            document.getElementById('hero-menu').classList.add('hidden-screen'); 
-            document.getElementById('main-menu').classList.remove('hidden-screen'); 
-        }
+        function showHeroMenu() { document.getElementById('main-menu').classList.add('hidden-screen'); document.getElementById('hero-menu').classList.remove('hidden-screen'); }
+        function showSettings() { document.getElementById('main-menu').classList.add('hidden-screen'); document.getElementById('settings-menu').classList.remove('hidden-screen'); }
+        function backToMain() { document.getElementById('hero-menu').classList.add('hidden-screen'); document.getElementById('settings-menu').classList.add('hidden-screen'); document.getElementById('main-menu').classList.remove('hidden-screen'); }
+        function selectHero(id) { currentHero = heroes[id]; playerHP = currentHero.hp; currentAmmo = currentHero.ammo; setupWeapon(); createHeroPreview(); document.getElementById('hero-tag').innerText = currentHero.name; backToMain(); }
+        function showHitMarker() { document.getElementById('hit-marker').style.opacity = '1'; setTimeout(() => document.getElementById('hit-marker').style.opacity = '0', 100); }
+        function resetGame() { playerHP = currentHero.hp; currentAmmo = currentHero.ammo; ultCharge = 0; enemies.forEach(e => { scene.remove(e); scene.remove(e.hpContainer); }); enemies = []; document.getElementById('game-over').classList.add('hidden-screen'); handleStartGame(); }
 
         window.onload = init;
     </script>
